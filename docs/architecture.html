@@ -1,0 +1,1137 @@
+<title>EmergencyAI Triaj Mimarisi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: vertical "building plan" — patient moves top→bottom through physical zones; services and data boundary sit in a band beside them */
+:root{
+  --bg:#f3f6f7; --panel:#ffffff; --ink:#14232a; --muted:#56666d; --line:#c9d5d9;
+  --accent:#0b6e7f; --accent-soft:#dcedf0;
+  --red:#c62f2a; --red-soft:#f8e1df; --amber:#b57900; --amber-soft:#f8ecd2; --green:#2c7a3f; --green-soft:#dff0e2;
+  --boundary:#7a5cc4; --boundary-soft:#ece6f8;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f181b; --panel:#162327; --ink:#e3ecee; --muted:#93a4aa; --line:#2b3d43;
+  --accent:#4fc0d2; --accent-soft:#16363d;
+  --red:#ff6f66; --red-soft:#3a1b1a; --amber:#f0b33f; --amber-soft:#3a2d12; --green:#6fcf86; --green-soft:#17321e;
+  --boundary:#b49cf5; --boundary-soft:#2a2342; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f181b; --panel:#162327; --ink:#e3ecee; --muted:#93a4aa; --line:#2b3d43;
+  --accent:#4fc0d2; --accent-soft:#16363d;
+  --red:#ff6f66; --red-soft:#3a1b1a; --amber:#f0b33f; --amber-soft:#3a2d12; --green:#6fcf86; --green-soft:#17321e;
+  --boundary:#b49cf5; --boundary-soft:#2a2342; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px;display:grid;gap:40px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+h1{font-size:clamp(1.7rem,3.6vw,2.5rem);font-weight:800;letter-spacing:-.01em}
+h2{font-size:1.25rem;font-weight:700;display:flex;gap:10px;align-items:baseline}
+h2 small{font-family:var(--f-body);font-weight:400;font-size:.85rem;color:var(--muted)}
+h3{font-size:.98rem;font-weight:700}
+p{margin:0}
+.lead{max-width:68ch;color:var(--muted);font-size:1.02rem}
+.mono{font-family:var(--f-mono);font-size:.8rem}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+header{display:grid;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--f-mono);font-size:.74rem;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+
+/* ── Main plan ── */
+.plan{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:860px){.plan{grid-template-columns:minmax(0,1fr)}}
+.flow{display:grid;gap:0}
+.zone{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px;position:relative}
+.zone .tag{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.zone ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.zone li{color:var(--ink)}
+.zone li span{color:var(--muted)}
+.arrow{height:30px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:.8rem}
+.arrow::before{content:"";width:2px;height:100%;background:var(--line)}
+.alarm{border-left:4px solid var(--red);background:var(--red-soft);padding:8px 12px;border-radius:0 8px 8px 0;font-size:.9rem}
+.alarm b{color:var(--red)}
+
+.pipe{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pipe .step{background:var(--accent-soft);border:1px solid var(--accent);color:var(--ink);border-radius:6px;padding:5px 9px;font-size:.85rem;display:grid;line-height:1.25}
+.pipe .step i{font-style:normal;font-family:var(--f-mono);font-size:.68rem;color:var(--muted)}
+.pipe .to{color:var(--accent);font-weight:700}
+.pipe .step.claude{border-color:var(--boundary);background:var(--boundary-soft)}
+
+.side{display:grid;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px}
+.engine .rules{display:grid;gap:8px}
+.engine .row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start}
+.engine .k{font-family:var(--f-mono);font-size:.72rem;padding:2px 7px;border-radius:5px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.formula{font-family:var(--f-mono);font-size:.8rem;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:10px;overflow-x:auto;white-space:pre}
+
+.boundary{border:2px dashed var(--boundary);background:var(--boundary-soft)}
+.boundary h3{color:var(--boundary)}
+
+/* ── CTAS strip ── */
+.ctas{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media (max-width:760px){.ctas{grid-template-columns:minmax(0,1fr)}}
+.lvl{border-radius:8px;padding:12px;display:grid;gap:4px;border:1px solid var(--line);background:var(--panel)}
+.lvl .n{font-family:var(--f-display);font-weight:800;font-size:1.5rem;line-height:1}
+.lvl.r{border-top:5px solid var(--red)} .lvl.r .n{color:var(--red)}
+.lvl.y{border-top:5px solid var(--amber)} .lvl.y .n{color:var(--amber)}
+.lvl.g{border-top:5px solid var(--green)} .lvl.g .n{color:var(--green)}
+.lvl dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:.82rem}
+.lvl dt{color:var(--muted)} .lvl dd{margin:0;font-variant-numeric:tabular-nums}
+
+/* ── Tables ── */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:.88rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td code{font-family:var(--f-mono);font-size:.78rem;background:var(--bg);padding:1px 5px;border-radius:4px}
+
+.phases{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;counter-reset:ph}
+@media (max-width:860px){.phases{grid-template-columns:minmax(0,1fr)}}
+.ph{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:6px;align-content:start}
+.ph b{font-family:var(--f-mono);font-size:.74rem;color:var(--accent)}
+.ph.now{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.ph p{font-size:.86rem;color:var(--muted)}
+
+.lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.lesson{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:grid;gap:4px;font-size:.88rem}
+.lesson .bad{color:var(--red);font-weight:600}
+.lesson .ok{color:var(--green);font-weight:600}
+footer{color:var(--muted);font-size:.82rem;display:grid;gap:4px}
+
+/* ── Schematic ── */
+.schema{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px}
+.schema svg{display:block;min-width:900px;width:100%;height:auto}
+.schema text{font-family:var(--f-body);fill:var(--ink);font-size:12px}
+.schema .t{font-family:var(--f-display);font-weight:700;font-size:13.5px}
+.schema .s{fill:var(--muted);font-size:11.5px}
+.schema .lbl{fill:var(--muted);font-family:var(--f-mono);font-size:10.5px}
+.schema .lbl.red{fill:var(--red)}
+.schema .lbl.vio{fill:var(--boundary)}
+.schema .box{fill:var(--bg);stroke:var(--line);stroke-width:1.2}
+.schema .zone{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2}
+.schema .eng{fill:var(--bg);stroke:var(--ink);stroke-width:1.6}
+.schema .ext{fill:var(--boundary-soft);stroke:var(--boundary);stroke-width:1.6}
+.schema .bound{fill:none;stroke:var(--boundary);stroke-width:1.4;stroke-dasharray:6 5}
+.schema .ln{fill:none;stroke:var(--muted);stroke-width:1.4}
+.schema .ln.red{stroke:var(--red);stroke-dasharray:5 4}
+.schema .ln.vio{stroke:var(--boundary)}
+.schema .hd{fill:var(--muted)}
+.schema .hd.red{fill:var(--red)}
+.schema .hd.vio{fill:var(--boundary)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.82rem;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend i{display:inline-block;width:22px;height:0;border-top:2px solid var(--muted)}
+.legend i.red{border-top:2px dashed var(--red)}
+.legend i.vio{border-top:2px solid var(--boundary)}
+.legend i.zone{height:12px;width:16px;border:1px solid var(--accent);background:var(--accent-soft)}
+
+/* ── Live schema states ── */
+.schema .ln{transition:stroke .3s,stroke-width .3s,opacity .3s}
+.schema.running .ln{opacity:.35}
+.schema.running .ln.act{opacity:1;stroke:var(--accent);stroke-width:2.6;stroke-dasharray:9 6;animation:flow .7s linear infinite}
+.schema.running .ln.vio.act{stroke:var(--boundary)}
+.schema.running .ln.red.act,.schema.running .ln.act.alarm{stroke:var(--red);stroke-width:3}
+@keyframes flow{to{stroke-dashoffset:-15}}
+.schema .nd rect{transition:stroke .3s,stroke-width .3s,filter .3s}
+.schema.running .nd{opacity:.55;transition:opacity .3s}
+.schema.running .nd.act{opacity:1}
+.schema.running .nd.act rect{stroke:var(--accent);stroke-width:2.6;filter:drop-shadow(0 0 7px var(--accent))}
+.schema.running .nd.act.vio rect{stroke:var(--boundary);filter:drop-shadow(0 0 8px var(--boundary))}
+.schema.running .nd.act.alarm rect{stroke:var(--red);filter:drop-shadow(0 0 10px var(--red));animation:blink .5s ease-in-out infinite alternate}
+@keyframes blink{to{stroke-width:4}}
+.schema .dots circle{pointer-events:none}
+.schema .now{fill:var(--accent);font-size:12px}
+@media (prefers-reduced-motion:reduce){.schema.running .ln.act,.schema.running .nd.act.alarm rect{animation:none}}
+
+/* ── Simulation block: a deliberately dark control-room screen inside the page ── */
+.sim{--s-bg:#0b1316;--s-panel:#111c20;--s-panel2:#16242a;--s-line:#24363c;--s-ink:#e2ecee;--s-muted:#8fa2a8;--s-accent:#4fc0d2;--s-red:#ff6259;--s-amber:#f2b13c;--s-green:#5fd07e;--s-vio:#b49cf5;
+  color-scheme:dark;background:var(--s-bg);color:var(--s-ink);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  display:grid;grid-template-columns:minmax(0,1fr) 360px;grid-template-areas:"stage side" "live side"}
+.s-stage{grid-area:stage;position:relative;height:500px;min-width:0}
+.s-stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.s-live{grid-area:live;border-top:1px solid var(--s-line);padding:10px;min-width:0}
+.s-live .schema{border:0;padding:0;background:var(--panel)}
+.s-live .schema svg{min-width:820px}
+.s-side{grid-area:side;background:var(--s-panel);border-left:1px solid var(--s-line);padding:14px;display:grid;gap:12px;align-content:start;max-height:1000px;overflow-y:auto}
+.sim button{font:600 12px var(--f-body);color:var(--s-ink);background:rgba(17,28,32,.9);border:1px solid var(--s-line);border-radius:7px;padding:6px 10px;cursor:pointer}
+.sim button[aria-pressed="true"]{border-color:var(--s-accent);color:var(--s-accent)}
+.sim button:focus-visible{outline:2px solid var(--s-accent);outline-offset:2px}
+.s-views{position:absolute;left:12px;bottom:12px;display:flex;flex-wrap:wrap;gap:6px;right:12px}
+.s-hint{position:absolute;right:12px;top:12px;font:11px var(--f-mono);color:var(--s-muted);background:rgba(11,19,22,.7);padding:3px 7px;border-radius:5px}
+.s-alarm{position:absolute;left:50%;top:14px;transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--s-red);color:#1a0706;font:700 13px var(--f-body);padding:8px 14px;border-radius:8px;box-shadow:0 6px 24px rgba(255,98,89,.35);animation:spulse 1s ease-in-out infinite alternate;z-index:2}
+@keyframes spulse{to{box-shadow:0 6px 34px rgba(255,98,89,.75)}}
+.s-sound{position:absolute;right:12px;top:42px}
+.s-side h3{font:800 1.05rem var(--f-display);margin:0;color:var(--s-ink)}
+.s-sub{color:var(--s-muted);font-size:12.5px;margin:2px 0 0}
+.s-scen{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.s-scen button{text-align:left;display:grid;gap:1px;padding:7px 9px}
+.s-scen button small{font:400 11px var(--f-body);color:var(--s-muted)}
+.s-ctrl{display:flex;flex-wrap:wrap;gap:6px}
+.s-stages{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.s-stages div{height:5px;border-radius:3px;background:var(--s-line)}
+.s-stages div.done{background:var(--s-accent);opacity:.55}
+.s-stages div.on{background:var(--s-accent)}
+.s-stageName{font:600 12.5px var(--f-body);margin-top:6px}
+.s-card{background:var(--s-panel2);border:1px solid var(--s-line);border-radius:9px;padding:10px 12px;display:grid;gap:8px}
+.s-card h4{font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--s-muted);margin:0}
+.s-kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:12.5px;margin:0}
+.s-kv dt{color:var(--s-muted)}
+.s-kv dd{margin:0;font-variant-numeric:tabular-nums;text-align:right}
+.s-kv dd.warn{color:var(--s-amber)} .s-kv dd.crit{color:var(--s-red)}
+.s-engine{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+.s-lv{display:grid;gap:1px}
+.s-lv span{font:600 10px var(--f-mono);color:var(--s-muted);text-transform:uppercase;letter-spacing:.06em}
+.s-lv b{font:800 1.15rem var(--f-display)}
+.s-badge{font:800 1.05rem var(--f-display);padding:8px 12px;border-radius:8px;border:2px solid var(--s-line);color:var(--s-muted);text-align:center;min-width:92px}
+.s-badge small{display:block;font:600 10px var(--f-mono);letter-spacing:.05em}
+.s-badge.r{border-color:var(--s-red);color:var(--s-red)} .s-badge.y{border-color:var(--s-amber);color:var(--s-amber)} .s-badge.g{border-color:var(--s-green);color:var(--s-green)}
+.s-why{margin:0;padding-left:16px;color:var(--s-muted);font-size:12px;display:grid;gap:2px}
+.s-nurse{font-size:12.5px}
+.s-log{display:grid;gap:5px;font-size:12.5px;max-height:220px;overflow-y:auto}
+.s-log p{margin:0;display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px}
+.s-log b{font:600 10.5px var(--f-mono);text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+.s-log .Avatar b{color:var(--s-accent)} .s-log .Claude b{color:var(--s-vio)} .s-log .Motor b{color:var(--s-amber)} .s-log .Alarm b,.s-log .Alarm span{color:var(--s-red)} .s-log .Sistem b{color:var(--s-muted)} .s-log .Hemşire b{color:var(--s-green)}
+.s-foot{color:var(--s-muted);font-size:11.5px;margin:0}
+@media (max-width:900px){
+  .sim{grid-template-columns:minmax(0,1fr);grid-template-areas:"stage" "live" "side"}
+  .s-stage{height:56vh;min-height:320px}
+  .s-side{border-left:0;border-top:1px solid var(--s-line);max-height:none}
+  .s-hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){.s-alarm{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">EmergencyAI · Mimari v0.2 · 21 Ekim 2026</span>
+    <h1>Acil serviste AI hemşire avatarıyla triaj</h1>
+    <p class="lead">Hasta acile yürürken kamera ölçmeye başlar, istasyonda sensöre elini koyar ve ekrandaki hemşire avatarıyla Türkçe konuşur. Sistem CTAS seviyesi önerir, triaj hemşiresi onaylar. Yalnızca yetişkin hastalar; imza yok, sözlü onay var.</p>
+    <div class="chips">
+      <span class="chip">CTAS 1–5</span><span class="chip">≥18 yaş</span><span class="chip">Sözlü onay</span><span class="chip">LLM: yalnız Claude</span><span class="chip">Ses ve video hastanede kalır</span><span class="chip">Hemşire onayı zorunlu</span>
+    </div>
+  </header>
+
+  <section style="display:grid;gap:10px">
+    <h2>Sistem şeması <small>bileşenler ve veri akışı</small></h2>
+    <div class="schema">
+      <svg class="live" viewBox="0 0 1110 690" role="img" aria-label="EmergencyAI sistem şeması: kiosk bölgeleri, hastane içi servisler, Claude API, triaj motoru ve hemşire paneli">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd red" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ahv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="hd vio" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <rect class="bound" x="15" y="45" width="850" height="635" rx="12"/>
+        <text class="lbl vio" x="30" y="66">HASTANE İÇİ · EDGE GPU SUNUCUSU · ham ses/video saklanmaz</text>
+
+        <text class="lbl" x="40" y="30">FİZİKSEL BÖLGELER</text>
+        <text class="lbl" x="290" y="30">ALGILAMA VE SES</text>
+        <text class="lbl" x="580" y="30">KARAR</text>
+        <text class="lbl vio" x="890" y="30">HASTANE DIŞI</text>
+
+        <!-- arrows first so boxes sit on top -->
+        <path class="ln" data-e="e1" d="M220,125 H288" marker-end="url(#ah)"/>
+        <path class="ln" data-e="e2" d="M220,226 H288" marker-end="url(#ah)"/>
+        <path class="ln" data-e="e3" d="M220,300 H288" marker-end="url(#ah)"/>
+        <text class="lbl" x="226" y="294">ses</text>
+        <path class="ln" data-e="e4" d="M290,380 H222" marker-end="url(#ah)"/>
+        <text class="lbl" x="232" y="374">görüntü+ses</text>
+        <path class="ln" data-e="e5" d="M520,125 H550 V210 H578" marker-end="url(#ah)"/>
+        <path class="ln" data-e="e6" d="M520,236 H578" marker-end="url(#ah)"/>
+        <path class="ln vio" data-e="e7" d="M520,300 H888" marker-end="url(#ahv)"/>
+        <text class="lbl vio" x="600" y="293">transkript (TC/ad maskeli)</text>
+        <path class="ln vio" data-e="e8" d="M890,365 H522" marker-end="url(#ahv)"/>
+        <text class="lbl vio" x="600" y="358">söylenecek cümle (stream)</text>
+        <path class="ln vio" data-e="e9" d="M990,275 V250 H832" marker-end="url(#ahv)"/>
+        <text class="lbl vio" x="842" y="243">record_findings</text>
+        <path class="ln" data-e="e10" d="M705,265 V398" marker-end="url(#ah)"/>
+        <path class="ln" data-e="e11" d="M705,482 V506" marker-end="url(#ah)"/>
+        <text class="lbl" x="712" y="498">öneri + gerekçe</text>
+        <path class="ln" data-e="e12" d="M705,576 V603" marker-end="url(#ah)"/>
+        <text class="lbl" x="712" y="594">onaylı seviye</text>
+        <path class="ln" data-e="e13" d="M580,440 H545 V405 H522" marker-end="url(#ah)"/>
+        <text class="lbl" x="540" y="458" text-anchor="end">sonraki soru · yönlendirme</text>
+        <path class="ln red" data-e="e14" d="M220,548 H578" marker-end="url(#ahr)"/>
+        <text class="lbl red" x="300" y="540">kötüleşme alarmı (görü servisi)</text>
+        <path class="ln red" data-e="e15" d="M130,170 V190 H260 V500 H560 V530 H578" marker-end="url(#ahr)"/>
+        <text class="lbl red" x="268" y="494">kritik bulgu kısayolu → CTAS 1–2</text>
+
+        <g class="nd" data-n="z1"><rect class="zone" x="40" y="80" width="180" height="90" rx="8"/>
+        <text class="t" x="54" y="102">1 · Koridor</text>
+        <text class="s" x="54" y="124">Termal kamera</text>
+        <text class="s" x="54" y="142">RGB kamera</text>
+        <text class="s" x="54" y="160">hasta yürürken, dokunmasız</text></g>
+
+        <g class="nd" data-n="z2"><rect class="zone" x="40" y="200" width="180" height="220" rx="8"/>
+        <text class="t" x="54" y="222">2 · Kiosk istasyonu</text>
+        <text class="s" x="54" y="246">Kimlik okuyucu</text>
+        <text class="s" x="54" y="266">Sensörler: SpO₂, nabız,</text>
+        <text class="s" x="54" y="282">tansiyon, ateş</text>
+        <text class="s" x="54" y="306">Mikrofon dizisi</text>
+        <text class="s" x="54" y="330">Dikey dokunmatik ekran</text>
+        <text class="s" x="54" y="346">+ 4–5 buton, ağrı yüzleri</text>
+        <text class="s" x="54" y="380">Sözlü onay: "onayladım"</text>
+        <text class="s" x="54" y="398">≥18 yaş</text></g>
+
+        <g class="nd" data-n="z3"><rect class="zone" x="40" y="515" width="180" height="70" rx="8"/>
+        <text class="t" x="54" y="537">3 · Bekleme salonu</text>
+        <text class="s" x="54" y="559">Bekleme kamerası</text>
+        <text class="s" x="54" y="575">sürekli izleme</text></g>
+
+        <g class="nd" data-n="gorus"><rect class="box" x="290" y="80" width="230" height="90" rx="8"/>
+        <text class="t" x="304" y="102">Görü servisi</text>
+        <text class="s" x="304" y="124">ateş · yürüyüş · postür</text>
+        <text class="s" x="304" y="142">davranış · kötüleşme</text>
+        <text class="s" x="304" y="160">poz tahmini, yüz tanıma yok</text></g>
+
+        <g class="nd" data-n="cihaz"><rect class="box" x="290" y="200" width="230" height="52" rx="8"/>
+        <text class="t" x="304" y="222">Cihaz geçidi</text>
+        <text class="s" x="304" y="241">vitaller · kimlik · MEDULA</text></g>
+
+        <g class="nd" data-n="stt"><rect class="box" x="290" y="278" width="230" height="44" rx="8"/>
+        <text class="t" x="304" y="298">faster-whisper STT</text>
+        <text class="s" x="304" y="314">Türkçe, akışlı, VAD</text></g>
+
+        <g class="nd" data-n="ses"><rect class="box" x="290" y="340" width="230" height="80" rx="8"/>
+        <text class="t" x="304" y="362">Ses + avatar</text>
+        <text class="s" x="304" y="384">Türkçe TTS → TSYNC</text>
+        <text class="s" x="304" y="402">→ Atlas avatar (Three.js)</text></g>
+
+        <g class="nd" data-n="durum"><rect class="box" x="580" y="195" width="250" height="70" rx="8"/>
+        <text class="t" x="594" y="217">Hasta durumu</text>
+        <text class="s" x="594" y="238">kamera + vital + konuşma bulguları</text>
+        <text class="s" x="594" y="255">tek oturum kaydı</text></g>
+
+        <g class="nd" data-n="motor"><rect class="eng" x="580" y="400" width="250" height="82" rx="8"/>
+        <text class="t" x="594" y="422">Triaj motoru</text>
+        <text class="s" x="594" y="443">CTAS kuralları · öneri = min(kural, AI)</text>
+        <text class="s" x="594" y="461">AI yalnız yükseltir</text>
+        <text class="s" x="594" y="476" style="fill:var(--red)">kritik bulgu → anında alarm</text></g>
+
+        <g class="nd" data-n="hemsire"><rect class="box" x="580" y="508" width="250" height="68" rx="8"/>
+        <text class="t" x="594" y="530">Hemşire paneli</text>
+        <text class="s" x="594" y="550">onay · düzeltme · alarmlar</text>
+        <text class="s" x="594" y="566">CTAS tekrar sayaçları</text></g>
+
+        <g class="nd" data-n="hbys"><rect class="box" x="580" y="605" width="250" height="56" rx="8"/>
+        <text class="t" x="594" y="627">HBYS / e-Nabız</text>
+        <text class="s" x="594" y="647">HL7 FHIR</text></g>
+
+        <g class="nd" data-n="claude"><rect class="ext" x="890" y="275" width="200" height="110" rx="8"/>
+        <text class="t" x="904" y="298">Claude API</text>
+        <text class="s" x="904" y="318">claude-haiku-5-5</text>
+        <text class="s" x="904" y="338">→ söylenecek cümle</text>
+        <text class="s" x="904" y="356">→ record_findings</text>
+        <text class="s" x="904" y="374">yalnız maskeli metin</text></g>
+
+        <g class="dots"></g>
+        <text class="lbl now" x="1095" y="686" text-anchor="end"></text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><i class="zone"></i>hastanın bulunduğu bölge</span>
+      <span><i></i>hastane içi veri akışı</span>
+      <span><i class="vio"></i>Claude API trafiği (yalnız metin)</span>
+      <span><i class="red"></i>alarm, hemşireye doğrudan</span>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <h2>Hastanın yolu ve sistemler <small>yukarıdan aşağı</small></h2>
+    <div class="plan">
+      <div class="flow">
+        <div class="zone">
+          <div class="tag"><h3>Bölge 1 · Yaklaşma koridoru</h3><span class="mono">5–10 m, dokunmasız</span></div>
+          <ul>
+            <li>Termal kamera <span>· yüz sıcaklığı taraması (kesin değer istasyonda)</span></li>
+            <li>RGB kamera + poz tahmini <span>· yürüyüş, postür, davranış (Atlas/postür modülü)</span></li>
+            <li>İzleme kimliği ile istasyon oturumuna bağlanır <span>· yüz tanıma yok</span></li>
+          </ul>
+          <div class="alarm"><b>Kritik bulgu kısayolu:</b> yığılma, düşme, tripod postürü, bilinç bulanıklığı → hasta istasyona gitmez, hemşireye anında CTAS 1–2 alarmı.</div>
+        </div>
+        <div class="arrow">hasta istasyona gelir</div>
+        <div class="zone">
+          <div class="tag"><h3>Bölge 2 · Triaj istasyonu (kiosk)</h3><span class="mono">dikey 43–55" ekran</span></div>
+          <ul>
+            <li>T.C. kimlik okuyucu + MEDULA <span>· 18 yaş altı → oturum açılmaz, hemşire</span></li>
+            <li><b>Sözlü onay:</b> avatar aydınlatma metnini okur, hasta "onayladım" der <span>· ses kesiti + transkript + metin sürümü saklanır</span></li>
+            <li>Sensörler <span>· SpO₂/nabız, tansiyon manşonu, temassız ateş</span></li>
+            <li>Ekran altı: 4–5 büyük buton, ağrı yüzleri, vücut haritası <span>· okuma bilmeyenler için</span></li>
+          </ul>
+          <h3 style="margin-top:4px">Konuşma hattı</h3>
+          <div class="pipe" aria-label="Konuşma hattı">
+            <span class="step">Mikrofon dizisi<i>VAD</i></span><span class="to">→</span>
+            <span class="step">faster-whisper<i>yerel STT</i></span><span class="to">→</span>
+            <span class="step claude">Claude Haiku 5.5<i>claude-haiku-5-5</i></span><span class="to">→</span>
+            <span class="step">Türkçe TTS<i>seçim açık</i></span><span class="to">→</span>
+            <span class="step">TSYNC<i>dudak senkronu</i></span><span class="to">→</span>
+            <span class="step">Atlas avatar<i>Three.js · ARKit 52</i></span>
+          </div>
+          <p class="mono" style="color:var(--muted)">Her turda tek Claude çağrısı: söylenecek cümle (streaming) + record_findings tool (strict). Hedef gecikme &lt; 1,5 sn.</p>
+        </div>
+        <div class="arrow">seviye önerisi → hemşire onayı</div>
+        <div class="zone">
+          <div class="tag"><h3>Bölge 3 · Bekleme salonu</h3><span class="mono">sürekli izleme</span></div>
+          <ul>
+            <li>Aynı görü servisi kötüleşme işaretlerini izler <span>· düşme, yığılma, postür değişimi</span></li>
+            <li>Yeniden değerlendirme süresi dolunca uyarı <span>· avatar kısa kontrol görüşmesi yapar</span></li>
+            <li>Yönlendirme ekrandan ve sesle <span>· bileklik veya etiket yazıcı yok</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="card engine">
+          <h3>Triaj motoru · asimetrik güvenlik</h3>
+          <div class="formula">rule  = CTAS kuralları(şikâyet, vital, ağrı, bilinç)
+ai    = Claude bulguları + kamera/sensör
+öneri = min(rule, ai)   # küçük sayı = daha acil
+kritik bulgu → 1–2 ve anında alarm</div>
+          <div class="rules">
+            <div class="row"><span class="k">kural</span><p>Yerel, deterministik, sürümlü; her karar için gerekçe listesi üretir. Hangi sorunun sorulacağını da o belirler.</p></div>
+            <div class="row"><span class="k">AI</span><p>Seviyeyi yalnızca yükseltebilir. Aşırı triaj kabul, eksik triaj engellenir.</p></div>
+            <div class="row"><span class="k">Faz 4</span><p>Belirsizlik tabanlı sınıflandırıcı (Dirichlet). Belirsizlik yüksekse karar otomatik hemşireye gider.</p></div>
+            <div class="row"><span class="k">hemşire</span><p>Onay olmadan seviye kesinleşmez. Her düzeltme gerekçesiyle kalibrasyon verisi olur.</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Hemşire paneli</h3>
+          <ul style="margin:0;padding-left:18px;display:grid;gap:3px">
+            <li>Kuyruk, renk ve gerekçeler</li>
+            <li>Onay / düzeltme (gerekçeli)</li>
+            <li>Kritik alarmlar ve yeniden değerlendirme sayaçları</li>
+            <li>HBYS'ye HL7 FHIR: Encounter, Observation, Condition, Flag</li>
+          </ul>
+        </div>
+
+        <div class="card boundary">
+          <h3>Veri sınırı</h3>
+          <p><b>Hastane içi edge GPU:</b> kamera, STT, TTS, TSYNC, avatar, kural motoru. Ham ses ve video saklanmaz, dışarı çıkmaz.</p>
+          <p><b>Dışarı giden tek şey:</b> maskelenmiş metin → Claude API (TC ve ad çıkarılır).</p>
+          <p><b>Claude erişilemezse:</b> buton tabanlı CTAS akışı; triaj durmaz.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <h2>CTAS seviyeleri <small>renk eşlemesi ATP tablosundan</small></h2>
+    <div class="ctas">
+      <div class="lvl r"><span class="n">1</span><b>Resüsitasyon</b><dl><dt>Renk</dt><dd>Kırmızı</dd><dt>Hemşire</dt><dd>Hemen</dd><dt>Tekrar</dt><dd>Sürekli</dd></dl></div>
+      <div class="lvl r"><span class="n">2</span><b>Acil</b><dl><dt>Renk</dt><dd>Kırmızı</dd><dt>Hemşire</dt><dd>Hemen</dd><dt>Tekrar</dt><dd>15 dk</dd></dl></div>
+      <div class="lvl r"><span class="n">3</span><b>Aciliyetli</b><dl><dt>Renk</dt><dd>Kırmızı</dd><dt>Hemşire</dt><dd>≤30 dk</dd><dt>Tekrar</dt><dd>30 dk</dd></dl></div>
+      <div class="lvl y"><span class="n">4</span><b>Az acil</b><dl><dt>Renk</dt><dd>Sarı</dd><dt>Hemşire</dt><dd>≤60 dk</dd><dt>Tekrar</dt><dd>60 dk</dd></dl></div>
+      <div class="lvl g"><span class="n">5</span><b>Acil değil</b><dl><dt>Renk</dt><dd>Yeşil</dd><dt>Hemşire</dt><dd>≤120 dk</dd><dt>Tekrar</dt><dd>120 dk</dd></dl></div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <h2>Teknoloji yığını</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Katman</th><th>Sistem</th><th>Nerede</th><th>Not</th></tr></thead>
+      <tbody>
+        <tr><td>Konuşma tanıma</td><td>faster-whisper, akışlı, Türkçe</td><td>Edge GPU</td><td>VAD + yönlü mikrofon (acil gürültüsü)</td></tr>
+        <tr><td>Görüşme + çıkarım</td><td>Claude Haiku 5.5 <code>claude-haiku-5-5</code></td><td>Claude API</td><td>effort <code>low</code>, streaming, prompt caching, <code>strict</code> tool</td></tr>
+        <tr><td>Ses sentezi</td><td>Türkçe TTS</td><td>Karar bekliyor</td><td>Yerel (gizlilik) ya da bulut (doğallık)</td></tr>
+        <tr><td>Dudak senkronu</td><td>TranscriptionSync (TSYNC)</td><td>Edge</td><td>Streaming CTC, P95 ≈ 0,48 sn</td></tr>
+        <tr><td>Avatar</td><td>Atlas renderer + gerçekçi hemşire (CC4 / Avaturn GLB)</td><td>Kiosk tarayıcısı</td><td>Three.js, ARKit 52 blendshape; VRoid yerine</td></tr>
+        <tr><td>Görü</td><td>Termal + RGB, poz tahmini, postür modülü</td><td>Edge GPU</td><td>Ham video saklanmaz</td></tr>
+        <tr><td>Triaj motoru</td><td>CTAS kural motoru (+ Faz 4 belirsizlik modeli)</td><td>Edge</td><td>Çevrimdışı çalışır</td></tr>
+        <tr><td>Entegrasyon</td><td>HL7 FHIR, e-Nabız, MEDULA</td><td>Hastane ağı</td><td>HBYS seçimi açık</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <h2>SMASS çalışmasından dersler <small>Lindner &amp; Ravioli, AJEM 2025</small></h2>
+    <div class="lessons">
+      <div class="lesson"><span class="bad">MTS "orange" hastaların %19'u "non-urgent"</span><span class="ok">AI seviyeyi kural motorunun altına indiremez</span></div>
+      <div class="lesson"><span class="bad">"Non-urgent" denenlerin %23'ü yattı</span><span class="ok">Bekleme salonu izleme + CTAS tekrar süreleri</span></div>
+      <div class="lesson"><span class="bad">Modelde vital bulgu yok</span><span class="ok">Vitaller zorunlu, CTAS düzelticileri uygulanır</span></div>
+      <div class="lesson"><span class="bad">Uyum çok düşük (κ = 0,167)</span><span class="ok">Sessiz modda ileriye dönük paralel çalışma</span></div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:14px">
+    <h2>Yol haritası</h2>
+    <div class="phases">
+      <div class="ph now"><b>Faz 0 · sıradaki</b><h3>Prototip</h3><p>Avatar + Türkçe diyalog + CTAS kural motoru + elle vital girişi + hemşire paneli</p></div>
+      <div class="ph"><b>Faz 1</b><h3>İstasyon</h3><p>Sensör paneli, kimlik okuyucu, sözlü onay kaydı, çevrimdışı buton akışı</p></div>
+      <div class="ph"><b>Faz 2</b><h3>Koridor</h3><p>Termal + RGB, yürüyüş/postür/davranış, kritik bulgu kısayolu</p></div>
+      <div class="ph"><b>Faz 3</b><h3>Bekleme salonu</h3><p>Sürekli kötüleşme izleme, tekrar değerlendirme sayaçları</p></div>
+      <div class="ph"><b>Faz 4</b><h3>Klinik</h3><p>Sessiz mod çalışması (eksik triaj ≤ %5, ağırlıklı κ ≥ 0,7), etik kurul, HBYS, MDR/TİTCK, belirsizlik modeli</p></div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:12px" id="simulasyon">
+    <h2>Canlı simülasyon <small>3D akış, sesli görüşme ve şema senkron çalışır</small></h2>
+    <p class="lead">Bir senaryo seçin. Hasta koridordan kiosk'a yürür, avatar konuşur, şemadaki ilgili kutular ve oklar aynı anda yanar. Ses için "Sesi aç" düğmesine basın. Hastalar ve değerler örnektir; sayfa gerçek model çağırmaz.</p>
+    <div class="sim">
+      <div class="s-stage" id="sStage">
+        <div class="s-alarm" id="sAlarm" hidden></div>
+        <button class="s-sound" id="sSound" aria-pressed="false">Sesi aç</button>
+        <div class="s-hint">sürükle: döndür</div>
+        <div class="s-views" id="sViews">
+          <button data-v="genel" aria-pressed="true">Genel</button>
+          <button data-v="koridor" aria-pressed="false">Koridor</button>
+          <button data-v="kiosk" aria-pressed="false">Kiosk</button>
+          <button data-v="hemsire" aria-pressed="false">Hemşire</button>
+          <button data-v="takip" aria-pressed="false">Hastayı takip et</button>
+        </div>
+      </div>
+      <div class="s-live" id="sLive"></div>
+      <div class="s-side">
+        <div>
+          <h3>Acil triaj akışı</h3>
+          <p class="s-sub">Kural motoru seviyeyi belirler, AI yalnız yükseltebilir, hemşire onaylar.</p>
+        </div>
+        <div class="s-scen" id="sScen"></div>
+        <div class="s-ctrl">
+          <button id="sPlay">Duraklat</button>
+          <button id="sRestart">Baştan</button>
+          <button id="sSpeed">Hız 1×</button>
+        </div>
+        <div>
+          <div class="s-stages" id="sStages"></div>
+          <div class="s-stageName" id="sStageName">—</div>
+        </div>
+        <div class="s-card"><h4>Ölçümler</h4><dl class="s-kv" id="sKv"></dl></div>
+        <div class="s-card">
+          <h4>Triaj motoru</h4>
+          <div class="s-engine">
+            <div class="s-lv"><span>Kural</span><b id="sRule">—</b></div>
+            <div class="s-lv"><span>AI önerisi</span><b id="sAi">—</b></div>
+            <div class="s-badge" id="sFinal">—<small>öneri</small></div>
+          </div>
+          <ul class="s-why" id="sWhy"></ul>
+          <div class="s-nurse" id="sNurse">Hemşire onayı bekleniyor</div>
+        </div>
+        <div class="s-card"><h4>Görüşme ve olaylar</h4><div class="s-log" id="sLog"></div></div>
+        <p class="s-foot" id="sVoice">Ses kapalı.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>Açık konular:</b> Türkçe TTS seçimi · gerçekçi hemşire modeli (CC4 mü Avaturn mu) · pilot hastanenin triaj sistemi · sözlü onay metninin hukuk/KVKK onayı · HBYS entegrasyonu.</p>
+    <p>Kaynaklar: ekip ses kaydı (21.10.2026), CAEP/NENA CTAS kartı, ATP↔CTAS tablosu, Lindner &amp; Ravioli <i>Am J Emerg Med</i> 94 (2025) 46–49, in4medicine.ch.</p>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = {floor:0x18262b, grid1:0x2b3f45, grid2:0x1f3036, wall:0x2a3d44, accent:0x4fc0d2, red:0xff6259, amber:0xf2b13c, green:0x5fd07e, vio:0xb49cf5, skin:0xd9a67e};
+const LV = {1:{c:'r',hex:C.red,name:'Resüsitasyon',col:'Kırmızı'},2:{c:'r',hex:C.red,name:'Acil',col:'Kırmızı'},3:{c:'r',hex:C.red,name:'Aciliyetli',col:'Kırmızı'},4:{c:'y',hex:C.amber,name:'Az acil',col:'Sarı'},5:{c:'g',hex:C.green,name:'Acil değil',col:'Yeşil'}};
+const $ = id => document.getElementById(id);
+const hexs = n => '#' + n.toString(16).padStart(6,'0');
+
+// ── live schema: clone the system diagram under the 3D stage ─────
+const topSchema = document.querySelector('.schema');
+const liveWrap = document.createElement('div'); liveWrap.className = 'schema';
+liveWrap.appendChild(topSchema.querySelector('svg').cloneNode(true));
+$('sLive').appendChild(liveWrap);
+const SCHEMAS = [topSchema, liveWrap];
+const SVGS = SCHEMAS.map(s => s.querySelector('svg'));
+const active = new Map();          // key "e:e7" / "n:claude" → {until, kind}
+let dots = [];
+const SVGNS = 'http://www.w3.org/2000/svg';
+function hl(edges, nodes, kind, hold){
+  const until = simT + (hold || 2.6);
+  edges.forEach(e => active.set('e:' + e, {until, kind, spawn:0}));
+  nodes.forEach(n => active.set('n:' + n, {until, kind}));
+  paintSchema();
+}
+function paintSchema(){
+  SVGS.forEach(svg => {
+    svg.querySelectorAll('[data-e]').forEach(p => { const a = active.get('e:' + p.dataset.e); p.classList.toggle('act', !!a); p.classList.toggle('alarm', !!a && a.kind === 'alarm'); });
+    svg.querySelectorAll('[data-n]').forEach(g => { const a = active.get('n:' + g.dataset.n); g.classList.toggle('act', !!a); g.classList.toggle('alarm', !!a && a.kind === 'alarm'); g.classList.toggle('vio', !!a && a.kind === 'vio'); });
+  });
+}
+function tickSchema(){
+  let changed = false;
+  for(const [k, a] of active){
+    if(simT > a.until){ active.delete(k); changed = true; continue; }
+    if(k[0] === 'e' && simT >= a.spawn && !reduceMotion){
+      a.spawn = simT + 0.32;
+      const id = k.slice(2);
+      SVGS.forEach(svg => {
+        const path = svg.querySelector('[data-e="' + id + '"]'); if(!path) return;
+        const c = document.createElementNS(SVGNS, 'circle');
+        c.setAttribute('r', a.kind === 'alarm' ? 5.5 : 4.5);
+        c.setAttribute('fill', a.kind === 'alarm' ? 'var(--red)' : (a.kind === 'vio' || path.classList.contains('vio')) ? 'var(--boundary)' : 'var(--accent)');
+        svg.querySelector('.dots').appendChild(c);
+        dots.push({c, path, len:path.getTotalLength(), t0:simT});
+      });
+    }
+  }
+  dots = dots.filter(d => {
+    const k = (simT - d.t0) / 0.85;
+    if(k >= 1 || k < 0){ d.c.remove(); return false; }
+    const pt = d.path.getPointAtLength(d.len * k);
+    d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y); d.c.setAttribute('opacity', k > .85 ? (1-k)/.15 : 1);
+    return true;
+  });
+  if(changed) paintSchema();
+}
+function schemaRun(on, label){
+  SCHEMAS.forEach(s => s.classList.toggle('running', on));
+  SVGS.forEach(svg => { const t = svg.querySelector('.now'); if(t) t.textContent = label || ''; });
+}
+function schemaFor(s){
+  const E = [], N = [], A = {e:[], n:[]};
+  const d = s.data || {};
+  if(s.spawn) N.push('z1');
+  if(d.thermal || d.gait){ E.push('e1','e5'); N.push('z1','gorus','durum'); }
+  if(d.id || d.consent || s.hand){ E.push('e2','e6'); N.push('z2','cihaz','durum'); }
+  if(s.vitals){ E.push('e2','e6'); N.push('z2','cihaz','durum'); }
+  if(s.claude){ hl(['e9'], ['claude','durum'], 'vio'); }
+  if(s.engine){ E.push('e10'); N.push('durum','motor'); }
+  if(s.nurseOk){ E.push('e11','e12'); N.push('motor','hemsire','hbys'); }
+  if(s.sit){ hl(['e14'], ['z3','gorus'], 'watch', 4); }
+  if(s.alarm){ if(s.fall) hl(['e15'], ['z1','hemsire'], 'alarm', 4); else hl(['e11'], ['motor','hemsire'], 'alarm', 4); }
+  if(E.length || N.length) hl(E, N, 'ok');
+}
+function schemaSay(stage){ hl(stage >= 3 ? ['e13','e8','e4'] : ['e8','e4'], ['claude','ses','z2'], 'vio', 2.4); }
+function schemaHear(){ hl(['e3','e7'], ['z2','stt','claude'], 'vio', 2.4); }
+
+// ── sound: Web Speech (Türkçe) + WebAudio effects ─────────────────
+const hasTTS = 'speechSynthesis' in window;
+let soundOn = false, actx = null, trVoices = [], busyUntil = 0;
+function loadVoices(){ if(!hasTTS) return; trVoices = speechSynthesis.getVoices().filter(v => /^tr/i.test(v.lang)); }
+if(hasTTS){ loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+$('sSound').onclick = () => {
+  soundOn = !soundOn;
+  $('sSound').setAttribute('aria-pressed', soundOn ? 'true' : 'false');
+  $('sSound').textContent = soundOn ? 'Sesi kapat' : 'Sesi aç';
+  if(soundOn){
+    try{ actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); }catch(e){ actx = null; }
+    loadVoices();
+    $('sVoice').textContent = !hasTTS ? 'Bu tarayıcı konuşma sentezini desteklemiyor; yalnız efektler çalar.'
+      : trVoices.length ? 'Ses: ' + trVoices.map(v => v.name).slice(0,2).join(', ') + ' (tarayıcı sesi; gerçek sistemde Türkçe TTS + TSYNC).'
+      : 'Tarayıcıda Türkçe ses bulunamadı; varsayılan ses tr-TR diliyle deneniyor.';
+    chime([660, 880]);
+  } else { if(hasTTS) speechSynthesis.cancel(); busyUntil = 0; $('sVoice').textContent = 'Ses kapalı.'; }
+};
+function speak(text, who){
+  if(!soundOn || !hasTTS) return 0;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'tr-TR';
+  if(trVoices.length){
+    const fem = trVoices.find(v => /female|kad[ıi]n|yelda|seda|filiz|emel|zeynep/i.test(v.name));
+    u.voice = who === 'avatar' ? (fem || trVoices[0]) : (trVoices.find(v => v !== (fem || trVoices[0])) || trVoices[0]);
+  }
+  u.pitch = who === 'avatar' ? 1.12 : (sc && sc.sex === 'm' ? 0.7 : 0.95);
+  u.rate = Math.min(1.6, Math.max(0.85, speed * 1.02));
+  busyUntil = wallT + 2 + text.length * 0.11;
+  u.onend = u.onerror = () => { busyUntil = 0; if(who === 'avatar') K.speakUntil = simT; if(who === 'patient') patient.sayUntil = simT + 0.3; };
+  if(who === 'avatar') K.speakUntil = Infinity;
+  speechSynthesis.speak(u);
+  return 1;
+}
+function tone(freq, t0, dur, type, vol){
+  if(!actx || !soundOn) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, actx.currentTime + t0);
+  g.gain.linearRampToValueAtTime(vol || .12, actx.currentTime + t0 + .02);
+  g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + t0 + dur);
+  o.connect(g).connect(actx.destination); o.start(actx.currentTime + t0); o.stop(actx.currentTime + t0 + dur + .05);
+}
+function chime(fs){ fs.forEach((f,i) => tone(f, i*.12, .35, 'sine', .1)); }
+function alarmSound(){ for(let i=0;i<3;i++){ tone(988, i*.42, .18, 'square', .06); tone(740, i*.42 + .2, .18, 'square', .06); } }
+function blip(){ tone(1320, 0, .08, 'sine', .05); }
+
+// ── renderer / scene ──────────────────────────────────────────────
+const stageEl = document.getElementById('sStage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stageEl.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1316);
+scene.fog = new THREE.Fog(0x0b1316, 45, 95);
+const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+cam.position.set(-4, 25, 25);
+const controls = new THREE.OrbitControls(cam, renderer.domElement);
+controls.target.set(-1, 0, -0.5);
+controls.enableDamping = true;
+controls.enableZoom = false;
+controls.maxPolarAngle = Math.PI * 0.47;
+controls.minDistance = 2; controls.maxDistance = 60;
+
+scene.add(new THREE.HemisphereLight(0xcfe8ee, 0x0b1316, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+sun.position.set(-10, 22, 12); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {left:-26, right:26, top:18, bottom:-18, near:1, far:70});
+sun.shadow.camera.updateProjectionMatrix();
+scene.add(sun);
+
+function resize(){
+  const r = stageEl.getBoundingClientRect();
+  renderer.setSize(Math.max(1, r.width), Math.max(1, r.height), false);
+  cam.aspect = Math.max(1, r.width) / Math.max(1, r.height);
+  cam.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stageEl);
+resize();
+
+const mat = (color, o) => new THREE.MeshStandardMaterial(Object.assign({color, roughness:.75, metalness:.05}, o||{}));
+function box(w,h,d,color,o){ const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color,o)); m.castShadow = true; m.receiveShadow = true; return m; }
+
+// ── labels (canvas sprites) ───────────────────────────────────────
+function makeLabel(text, color, scale){
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+  const tex = new THREE.CanvasTexture(cv);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false}));
+  sp.renderOrder = 10;
+  const s = scale || 3; sp.scale.set(s, s/4, 1);
+  sp.userData = {cv, tex};
+  setLabel(sp, text, color);
+  return sp;
+}
+function setLabel(sp, text, color){
+  const {cv, tex} = sp.userData, g = cv.getContext('2d');
+  g.clearRect(0,0,512,128);
+  if(!text){ tex.needsUpdate = true; sp.visible = false; return; }
+  sp.visible = true;
+  g.font = '600 44px "Source Sans 3", "Segoe UI", sans-serif';
+  const w = Math.min(500, g.measureText(text).width + 44);
+  g.fillStyle = 'rgba(11,19,22,.86)';
+  roundRect(g, (512-w)/2, 22, w, 84, 18); g.fill();
+  g.strokeStyle = color || '#4fc0d2'; g.lineWidth = 4; g.stroke();
+  g.fillStyle = color || '#e2ecee'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 256, 65, 470);
+  tex.needsUpdate = true;
+}
+function roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+
+// ── building ──────────────────────────────────────────────────────
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(46, 30), mat(C.floor, {roughness:.95}));
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
+const grid = new THREE.GridHelper(46, 23, C.grid1, C.grid2); grid.position.y = 0.005; scene.add(grid);
+
+function zonePatch(x, z, w, d, color, label){
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({color, transparent:true, opacity:.13}));
+  p.rotation.x = -Math.PI/2; p.position.set(x, 0.01, z); scene.add(p);
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), new THREE.LineBasicMaterial({color, transparent:true, opacity:.55}));
+  edge.rotation.x = -Math.PI/2; edge.position.set(x, 0.02, z); scene.add(edge);
+  if(label){ const l = makeLabel(label, '#' + color.toString(16).padStart(6,'0'), 4.4); l.position.set(x, 2.8, z - d/2 + 0.6); scene.add(l); }
+}
+const wallMat = mat(C.wall, {transparent:true, opacity:.55});
+function wall(x1, z1, x2, z2, h){
+  const len = Math.hypot(x2-x1, z2-z1), m = new THREE.Mesh(new THREE.BoxGeometry(len, h||2.2, 0.18), wallMat);
+  m.position.set((x1+x2)/2, (h||2.2)/2, (z1+z2)/2); m.rotation.y = -Math.atan2(z2-z1, x2-x1); m.receiveShadow = true; scene.add(m);
+}
+// outer shell with entrance gap on the west side
+wall(-23,-15, 23,-15); wall(-23,15, 23,15); wall(23,-15, 23,15);
+wall(-23,-15, -23,-2.5); wall(-23,2.5, -23,15);
+// corridor walls
+wall(-23,-4, -3,-4); wall(-23,4, -3,4);
+// entrance sign
+const ent = makeLabel('Acil girişi', '#e2ecee', 3.2); ent.position.set(-21.5, 3, 0); scene.add(ent);
+
+zonePatch(-13, 0, 18, 7.6, C.accent, 'Bölge 1 · Koridor');
+zonePatch(0, 0, 6, 7.6, C.accent, 'Bölge 2 · Kiosk');
+zonePatch(14.5, -9.5, 15, 9, C.red, 'Kırmızı alan · CTAS 1–3');
+zonePatch(13, 7.5, 17, 11, C.amber, 'Bölge 3 · Bekleme (sarı/yeşil)');
+zonePatch(4.5, -9, 7, 6, C.green, 'Triaj hemşiresi');
+
+// resus beds in red area
+for(let i=0;i<3;i++){ const b = box(2.1,0.6,1,0xc9d6da); b.position.set(10.5 + i*3.4, 0.45, -12.6); scene.add(b); const bl = box(2.1,0.08,1, C.red, {emissive:C.red, emissiveIntensity:.15}); bl.position.set(10.5+i*3.4,0.8,-12.6); scene.add(bl); }
+
+// waiting room chairs
+const chairSpots = [];
+for(let r=0;r<3;r++) for(let c=0;c<6;c++){
+  const x = 7 + c*2, z = 5 + r*2.6;
+  const seat = box(1.1,0.12,0.9,0x3c5961); seat.position.set(x,0.5,z); scene.add(seat);
+  const back = box(1.1,0.8,0.12,0x3c5961); back.position.set(x,0.9,z+0.45); scene.add(back);
+  for(const lx of [-0.45,0.45]) for(const lz of [-0.35,0.35]){ const l = box(0.06,0.5,0.06,0x2a3d44); l.position.set(x+lx,0.25,z+lz); scene.add(l); }
+  chairSpots.push([x, z]);
+}
+
+// nurse desk
+const desk = box(4,1.05,1.3,0x2f4950); desk.position.set(4.5,0.52,-8.2); scene.add(desk);
+const mon = box(1.3,0.85,0.08,0x0b1316,{emissive:0x113a42, emissiveIntensity:1}); mon.position.set(4.5,1.6,-8.5); scene.add(mon);
+const monScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.18,0.72), new THREE.MeshBasicMaterial({color:0x4fc0d2}));
+monScreen.position.set(4.5,1.6,-8.45); scene.add(monScreen);
+const alarmRing = new THREE.Mesh(new THREE.RingGeometry(1.6,2,48), new THREE.MeshBasicMaterial({color:C.red, transparent:true, opacity:0, side:THREE.DoubleSide}));
+alarmRing.rotation.x = -Math.PI/2; alarmRing.position.set(4.5,0.03,-7.3); scene.add(alarmRing);
+const alarmLight = new THREE.PointLight(C.red, 0, 9); alarmLight.position.set(4.5,3,-7.5); scene.add(alarmLight);
+
+// ── cameras with view cones ───────────────────────────────────────
+function sensorCam(pos, target, color, label){
+  const g = new THREE.Group();
+  const pole = box(0.12, pos[1], 0.12, 0x5d747b); pole.position.set(pos[0], pos[1]/2, pos[2]); g.add(pole);
+  const head = box(0.45,0.3,0.6, 0x1c2a2f, {emissive:color, emissiveIntensity:.25}); head.position.set(...pos); g.add(head);
+  head.lookAt(target[0], target[1], target[2]);
+  const h = Math.hypot(target[0]-pos[0], target[1]-pos[1], target[2]-pos[2]);
+  const geo = new THREE.ConeGeometry(Math.tan(0.42)*h, h, 32, 1, true);
+  geo.translate(0, -h/2, 0); geo.rotateX(-Math.PI/2);
+  const cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color, transparent:true, opacity:.07, side:THREE.DoubleSide, depthWrite:false}));
+  cone.position.set(...pos); cone.lookAt(target[0], target[1], target[2]); g.add(cone);
+  const l = makeLabel(label, '#' + color.toString(16).padStart(6,'0'), 3.2); l.position.set(pos[0], pos[1]+0.8, pos[2]); g.add(l);
+  scene.add(g); return cone;
+}
+const thermalCone = sensorCam([-9.5,2.8,-3.7], [-15,0,0.5], 0xff8a3d, 'Termal kamera');
+const rgbCone = sensorCam([-9.5,2.8,3.7], [-14,0,-0.5], C.accent, 'RGB + poz');
+const waitCone = sensorCam([21.8,3.2,13.6], [12,0,6], C.accent, 'Bekleme kamerası');
+
+// ── kiosk ─────────────────────────────────────────────────────────
+const kiosk = new THREE.Group(); kiosk.position.set(0,0,0); kiosk.rotation.y = -Math.PI/2; scene.add(kiosk);
+const kBase = box(1.2,0.1,0.8,0x2f4950); kBase.position.y = 0.05; kiosk.add(kBase);
+const kBody = box(1.25,2.3,0.22,0x22343a); kBody.position.set(0,1.25,-0.05); kiosk.add(kBody);
+const kCv = document.createElement('canvas'); kCv.width = 360; kCv.height = 640;
+const kTex = new THREE.CanvasTexture(kCv);
+const kScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.96), new THREE.MeshBasicMaterial({map:kTex}));
+kScreen.position.set(0,1.3,0.07); kiosk.add(kScreen);
+const sensorArm = box(0.5,0.08,0.45,0x2f4950); sensorArm.position.set(0.95,1.05,0.15); kiosk.add(sensorArm);
+const handPad = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,0.3), mat(0x113a42,{emissive:C.accent, emissiveIntensity:.15}));
+handPad.position.set(0.95,1.105,0.15); kiosk.add(handPad);
+const cuff = box(0.16,0.3,0.16,0x3c5961); cuff.position.set(0.95,1.25,-0.05); kiosk.add(cuff);
+const micBar = box(0.9,0.06,0.08,0x0b1316,{emissive:C.accent, emissiveIntensity:.3}); micBar.position.set(0,2.45,0.04); kiosk.add(micBar);
+const kLabel = makeLabel('AI hemşire kiosku', '#4fc0d2', 3); kLabel.position.set(0,3.3,0); kiosk.add(kLabel);
+
+const K = {say:'Hoş geldiniz. Lütfen yaklaşın.', patient:'', buttons:[], speakUntil:0, vitals:null, banner:'', ctas:0};
+function wrap(g, text, maxW){
+  const words = text.split(' '), lines = []; let line = '';
+  for(const w of words){ const t = line ? line + ' ' + w : w; if(g.measureText(t).width > maxW && line){ lines.push(line); line = w; } else line = t; }
+  if(line) lines.push(line); return lines;
+}
+function drawKiosk(t){
+  const g = kCv.getContext('2d'), W = 360, H = 640;
+  const grd = g.createLinearGradient(0,0,0,H); grd.addColorStop(0,'#123138'); grd.addColorStop(1,'#0b1a1e');
+  g.fillStyle = grd; g.fillRect(0,0,W,H);
+  g.fillStyle = '#0b1316'; g.fillRect(0,0,W,40);
+  g.fillStyle = '#4fc0d2'; g.font = '600 15px "JetBrains Mono", monospace'; g.textBaseline = 'middle';
+  g.fillText('EmergencyAI · Triaj', 14, 20);
+  if(K.vitals){ g.fillStyle = '#8fa2a8'; g.font = '600 12px "JetBrains Mono", monospace'; g.textAlign = 'right'; g.fillText(K.vitals, W-12, 20); g.textAlign = 'left'; }
+  // avatar
+  const speaking = t < K.speakUntil, cx = W/2, cy = 165;
+  g.fillStyle = '#1d4a52'; g.beginPath(); g.ellipse(cx, cy+150, 115, 70, 0, Math.PI, 0); g.fill();       // shoulders/scrubs
+  g.fillStyle = '#d9a67e'; g.fillRect(cx-20, cy+62, 40, 34);                                            // neck
+  g.fillStyle = '#3a2418'; g.beginPath(); g.ellipse(cx, cy-12, 80, 92, 0, 0, Math.PI*2); g.fill();       // hair
+  g.fillStyle = '#e2b48c'; g.beginPath(); g.ellipse(cx, cy+8, 66, 80, 0, 0, Math.PI*2); g.fill();        // face
+  g.fillStyle = '#3a2418'; g.beginPath(); g.ellipse(cx, cy-58, 70, 34, 0, Math.PI, 0); g.fill();         // fringe
+  const blink = (t % 4) < 0.12;
+  g.fillStyle = '#1b1210';
+  for(const ex of [-24, 24]){ g.beginPath(); g.ellipse(cx+ex, cy, 7, blink ? 1.2 : 7.5, 0, 0, Math.PI*2); g.fill(); }
+  g.strokeStyle = '#7a4a34'; g.lineWidth = 3;
+  for(const ex of [-24, 24]){ g.beginPath(); g.moveTo(cx+ex-12, cy-16); g.lineTo(cx+ex+12, cy-17); g.stroke(); }
+  const open = speaking ? 4 + 10*Math.abs(Math.sin(t*13)) * (0.6 + 0.4*Math.sin(t*5.3)) : 2;
+  g.fillStyle = '#7d2f2f'; g.beginPath(); g.ellipse(cx, cy+44, 17, open, 0, 0, Math.PI*2); g.fill();
+  g.fillStyle = '#4fc0d2'; g.fillRect(cx-40, cy+124, 80, 6);                                            // badge strip
+  // speech bubbles
+  let y = 330;
+  g.font = '600 18px "Source Sans 3", sans-serif'; g.textBaseline = 'top';
+  const aLines = wrap(g, K.say, W-56).slice(0,5);
+  g.fillStyle = 'rgba(79,192,210,.14)'; roundRect(g, 16, y, W-32, aLines.length*24+20, 14); g.fill();
+  g.fillStyle = '#e2ecee'; aLines.forEach((l,i)=>g.fillText(l, 28, y+10+i*24));
+  y += aLines.length*24 + 32;
+  if(K.patient){
+    g.font = '400 16px "Source Sans 3", sans-serif';
+    const pLines = wrap(g, '“' + K.patient + '”', W-80).slice(0,3);
+    const bw = W-60;
+    g.fillStyle = 'rgba(226,236,238,.08)'; roundRect(g, W-16-bw, y, bw, pLines.length*21+16, 12); g.fill();
+    g.fillStyle = '#c7d4d7'; pLines.forEach((l,i)=>g.fillText(l, W-4-bw, y+8+i*21));
+    y += pLines.length*21 + 26;
+  }
+  // buttons
+  if(K.buttons.length){
+    const bh = 44, gap = 8; let by = H - 24 - K.buttons.length*(bh+gap);
+    g.font = '600 18px "Source Sans 3", sans-serif'; g.textBaseline = 'middle';
+    K.buttons.forEach(b=>{ g.fillStyle = '#1d4a52'; roundRect(g, 24, by, W-48, bh, 10); g.fill(); g.strokeStyle='#4fc0d2'; g.lineWidth=2; g.stroke(); g.fillStyle='#e2ecee'; g.textAlign='center'; g.fillText(b, W/2, by+bh/2); g.textAlign='left'; by += bh+gap; });
+  }
+  if(K.ctas){
+    const lv = LV[K.ctas], col = lv.c==='r' ? '#ff6259' : lv.c==='y' ? '#f2b13c' : '#5fd07e';
+    g.fillStyle = col; roundRect(g, 24, H-86, W-48, 62, 12); g.fill();
+    g.fillStyle = '#0b1316'; g.font = '800 22px "Archivo", sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+    g.fillText('CTAS ' + K.ctas + ' · ' + lv.col + ' alan', W/2, H-55); g.textAlign='left';
+  }
+  if(K.banner){
+    g.fillStyle = 'rgba(255,98,89,.92)'; g.fillRect(0, 40, W, 34);
+    g.fillStyle = '#1a0706'; g.font = '700 15px "Source Sans 3", sans-serif'; g.textBaseline='middle'; g.fillText(K.banner, 14, 57);
+  }
+  kTex.needsUpdate = true;
+}
+
+// ── people ────────────────────────────────────────────────────────
+function makeHuman(shirt, pants, hair){
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const legGeo = new THREE.CylinderGeometry(0.1,0.085,0.86,10); legGeo.translate(0,-0.43,0);
+  const armGeo = new THREE.CylinderGeometry(0.075,0.065,0.66,10); armGeo.translate(0,-0.33,0);
+  const legs = [-0.12,0.12].map(x=>{ const l = new THREE.Mesh(legGeo, mat(pants)); l.position.set(x,0.9,0); l.castShadow = true; body.add(l); return l; });
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.21,0.62,14), mat(shirt)); torso.position.y = 1.2; torso.castShadow = true; body.add(torso);
+  const arms = [-0.32,0.32].map(x=>{ const a = new THREE.Mesh(armGeo, mat(shirt)); a.position.set(x,1.48,0); a.castShadow = true; body.add(a); return a; });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17,16,12), mat(C.skin)); head.position.y = 1.68; head.castShadow = true; body.add(head);
+  const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.175,16,12,0,Math.PI*2,0,Math.PI/2), mat(hair)); hairM.position.y = 1.7; body.add(hairM);
+  const halo = new THREE.Mesh(new THREE.RingGeometry(0.42,0.55,40), new THREE.MeshBasicMaterial({color:C.accent, transparent:true, opacity:0, side:THREE.DoubleSide}));
+  halo.rotation.x = -Math.PI/2; halo.position.y = 0.03; root.add(halo);
+  const tag = makeLabel('', '#e2ecee', 2.6); tag.position.y = 2.35; root.add(tag);
+  const say = makeLabel('', '#e2ecee', 3.6); say.position.y = 2.95; root.add(say);
+  scene.add(root);
+  return {root, body, legs, arms, torso, halo, tag, say, path:[], speed:1.3, phase:0, mode:'stand', clutch:false, sayUntil:0};
+}
+const patient = makeHuman(0x7d8f96, 0x2b3a55, 0x2a1d16);
+const nurse = makeHuman(0x2f8fa0, 0x2f8fa0, 0x1b1210);
+const NURSE_HOME = [4.5, -7.2];
+
+function placeAt(h, x, z, faceX, faceZ){ h.root.position.set(x,0,z); h.path = []; if(faceX!==undefined) h.root.rotation.y = Math.atan2(faceX-x, faceZ-z); }
+function resetPose(h){ h.mode='stand'; h.clutch=false; h.body.rotation.set(0,0,0); h.body.position.set(0,0,0); h.legs.forEach(l=>l.rotation.set(0,0,0)); h.arms.forEach(a=>a.rotation.set(0,0,0)); }
+const PACE = {slow:0.8, walk:1.3, limp:0.7, run:3.2, stagger:0.7};
+function setPath(h, pts, pace){ h.path = pts.map(p=>new THREE.Vector3(p[0],0,p[1])); h.speed = PACE[pace||'walk']; h.pace = pace||'walk'; if(h.mode!=='fallen') resetPoseKeep(h); }
+function resetPoseKeep(h){ if(h.mode==='sit'){ h.mode='stand'; h.body.position.y=0; h.legs.forEach(l=>l.rotation.x=0); } }
+
+function stepHuman(h, dt){
+  if(h.mode === 'fallen') return;
+  if(h.path.length){
+    const p = h.root.position, tgt = h.path[0], d = tgt.clone().sub(p); d.y = 0;
+    const dist = d.length(), stepLen = h.speed * dt;
+    if(dist <= stepLen){ p.copy(tgt); h.path.shift(); }
+    else { d.normalize(); p.addScaledVector(d, stepLen); const yaw = Math.atan2(d.x, d.z); h.root.rotation.y += angDiff(yaw, h.root.rotation.y) * Math.min(1, dt*10); }
+    h.phase += dt * h.speed * 5.2;
+    const amp = h.pace === 'run' ? 0.75 : 0.45, s = Math.sin(h.phase);
+    h.legs[0].rotation.x = s*amp; h.legs[1].rotation.x = -s*amp * (h.pace==='limp' ? 0.35 : 1);
+    h.arms[0].rotation.x = -s*amp*0.8; h.arms[1].rotation.x = h.clutch ? 0 : s*amp*0.8;
+    h.body.position.y = Math.abs(Math.cos(h.phase))*0.04 - (h.pace==='limp' && s>0 ? 0.04 : 0);
+    if(h.pace === 'stagger') h.body.rotation.z = Math.sin(h.phase*0.5)*0.12;
+  } else if(h.mode !== 'sit'){
+    h.legs.forEach(l=>l.rotation.x *= 0.85); h.arms[0].rotation.x *= 0.85; if(!h.clutch) h.arms[1].rotation.x *= 0.85;
+    h.body.position.y *= 0.8;
+  }
+  if(h.clutch){ h.arms[1].rotation.x = -1.25; h.arms[1].rotation.z = 0.55; } else h.arms[1].rotation.z *= 0.8;
+}
+function angDiff(a, b){ let d = a - b; while(d > Math.PI) d -= Math.PI*2; while(d < -Math.PI) d += Math.PI*2; return d; }
+function sit(h, faceX, faceZ){ h.mode='sit'; h.path=[]; h.root.rotation.y = Math.atan2(faceX-h.root.position.x, faceZ-h.root.position.z); h.body.position.y = -0.38; h.legs.forEach(l=>l.rotation.x = -1.45); }
+function fall(h){ h.mode='fallen'; h.path=[]; h.legs.forEach(l=>l.rotation.x=0); h.body.rotation.x = -Math.PI/2; h.body.position.set(0,0.22,0); }
+
+
+// ── panel ─────────────────────────────────────────────────────────
+const STAGES = ['Koridor taraması','Kimlik ve sözlü onay','Vital ölçüm','Görüşme (Claude)','Triaj motoru','Hemşire onayı','Yönlendirme'];
+$('sStages').innerHTML = STAGES.map(()=>'<div></div>').join('');
+const FIELDS = [['thermal','Termal (koridor)'],['gait','Yürüyüş / postür'],['id','Kimlik'],['consent','Onay'],['hr','Nabız'],['spo2','SpO₂'],['bp','Tansiyon'],['temp','Ateş'],['complaint','Şikâyet (Claude)'],['pain','Ağrı'],['flags','Kırmızı bayrak']];
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderKV(data){
+  $('sKv').innerHTML = FIELDS.map(([k,l])=>{ const v = data[k]; const val = v ? (v.v||v) : '—'; const cls = v && v.s ? ' class="'+v.s+'"' : ''; return '<dt>'+l+'</dt><dd'+cls+'>'+esc(val)+'</dd>'; }).join('');
+}
+function setStage(i){ [...$('sStages').children].forEach((d,j)=>{ d.className = j<i ? 'done' : j===i ? 'on' : ''; }); const n = (i+1) + ' / 7 · ' + STAGES[i]; $('sStageName').textContent = n; schemaRun(true, sc ? sc.name + ' · ' + n : n); }
+function addLog(who, text){ const p = document.createElement('p'); p.className = who; p.innerHTML = '<b>'+esc(who)+'</b><span>'+esc(text)+'</span>'; const lg = $('sLog'); lg.appendChild(p); lg.scrollTop = lg.scrollHeight; }
+function setEngine(e){
+  $('sRule').textContent = e.rule ? 'CTAS ' + e.rule : '—';
+  $('sAi').textContent = e.ai ? 'CTAS ' + e.ai : '—';
+  const f = e.rule && e.ai ? Math.min(e.rule, e.ai) : (e.rule || e.ai || 0);
+  const b = $('sFinal'); b.className = 's-badge' + (f ? ' ' + LV[f].c : '');
+  b.innerHTML = (f ? 'CTAS ' + f : '—') + '<small>' + (f ? LV[f].name.toUpperCase() : 'ÖNERİ') + '</small>';
+  $('sWhy').innerHTML = (e.why||[]).map(w=>'<li>'+esc(w)+'</li>').join('');
+}
+
+// ── scenarios ─────────────────────────────────────────────────────
+const KSPOT = [-1.6, 0];
+const SCENARIOS = [
+ { id:'gogus', name:'Göğüs ağrısı', meta:'58 yaş, erkek', sex:'m', steps:[
+  {stage:0, spawn:[-22,0.4], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-14,0.2]], pace:'slow', clutch:true, data:{thermal:'36,9 °C'}, tag:['36,9 °C · normal','#5fd07e'], halo:C.accent, log:'Termal kamera: yüz sıcaklığı 36,9 °C.', dur:1},
+  {stage:0, path:[[-7,0]], pace:'slow', data:{gait:{v:'yavaş · göğsü tutuyor', s:'warn'}}, tag:['Postür: göğsü tutuyor','#f2b13c'], log:'RGB + poz: yavaş yürüyüş, sağ eli göğsünde.', dur:1},
+  {stage:1, path:[KSPOT], pace:'slow', tag:null, say:'Merhaba, ben acil servisin triaj asistanıyım. Kimliğinizi okutur musunuz?', dur:2.2},
+  {stage:1, data:{id:'58 yaş · erkek · MEDULA ✓'}, say:'Bilgilerinizi kaydetmem gerekiyor; metni size okudum. Onaylıyor musunuz?', buttons:['Onaylıyorum','Tekrar oku','Hemşire çağır'], dur:2.6},
+  {stage:1, patient:'Onayladım.', data:{consent:'sözlü ✓ · ses kesiti kayıtlı'}, dur:1.3},
+  {stage:2, say:'Teşekkürler. Elinizi sağdaki panele koyun, manşonu kolunuza takacağım.', hand:true, dur:2.6},
+  {stage:2, data:{hr:{v:'112 /dk', s:'warn'}, spo2:'%94', bp:{v:'165/98', s:'warn'}, temp:'36,8 °C'}, vitals:'NB 112 · SpO₂ 94 · TA 165/98', log:'Sensörler: vitaller alındı.', dur:1.2},
+  {stage:3, say:'Bugün sizi buraya ne getirdi?', dur:1.6},
+  {stage:3, patient:'Yarım saattir göğsümde baskı var, sol koluma vuruyor.', claude:'record_findings → şikâyet: göğüs ağrısı (kardiyak özellikli), başlangıç: 30 dk, kola yayılım, güven 0,93', data:{complaint:{v:'Göğüs ağrısı · kardiyak', s:'crit'}, flags:{v:'kola yayılım · 30 dk', s:'crit'}}, alarm:'Kritik cevap: kardiyak göğüs ağrısı → hemşireye anında bildirim', dur:2},
+  {stage:3, say:'Ağrınız 0 ile 10 arasında kaç?', buttons:['0–3','4–7','8–10'], dur:1.6},
+  {stage:3, patient:'Sekiz.', data:{pain:{v:'8 / 10', s:'crit'}}, dur:1.1},
+  {stage:4, engine:{rule:2, ai:2, why:['Göğüs ağrısı, kardiyak özellikli → CTAS 2','Nabız 112 · TA 165/98 destekliyor']}, log:'Kural CTAS 2, AI CTAS 2 → öneri CTAS 2.', who:'Motor', dur:1.8},
+  {stage:5, nurse:[[3,-4],[1,-2],[-1,-1.3]], nursePace:'run', waitNurse:true, say:'Hemşiremiz yanınıza geliyor. Lütfen bekleyin.', dur:.4},
+  {stage:5, nurseOk:'CTAS 2 onaylandı (yerinde)', final:2, dur:1.4},
+  {stage:6, path:[[-1,3],[6,2.5],[9,-6],[10.5,-11.4]], pace:'slow', nurse:[[-0.4,1.6],[-0.2,3.6],[6.6,3.3],[9.8,-5.5],[11.5,-10.8]], nursePace:'slow', log:'Kırmızı alana, resüsitasyon yatağına yönlendirildi.', dur:2.5}
+ ]},
+ { id:'bilek', name:'Ayak bileği', meta:'24 yaş, kadın', sex:'f', steps:[
+  {stage:0, spawn:[-22,-0.4], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-14,-0.2]], pace:'limp', data:{thermal:'36,6 °C'}, tag:['36,6 °C · normal','#5fd07e'], halo:C.accent, log:'Termal kamera: 36,6 °C.', dur:1},
+  {stage:0, path:[[-7,0]], pace:'limp', data:{gait:{v:'sol ayakta topallama', s:'warn'}}, tag:['Yürüyüş: topallama','#f2b13c'], log:'RGB + poz: sol ayağa yük vermiyor.', dur:1},
+  {stage:1, path:[KSPOT], pace:'limp', tag:null, say:'Merhaba, ben acil servisin triaj asistanıyım. Kimliğinizi okutur musunuz?', dur:2},
+  {stage:1, data:{id:'24 yaş · kadın · MEDULA ✓'}, say:'Bilgilerinizi kaydetmem gerekiyor; metni size okudum. Onaylıyor musunuz?', buttons:['Onaylıyorum','Tekrar oku','Hemşire çağır'], dur:2.4},
+  {stage:1, patient:'Onayladım.', data:{consent:'sözlü ✓ · ses kesiti kayıtlı'}, dur:1.2},
+  {stage:2, say:'Elinizi sağdaki panele koyun, manşonu kolunuza takacağım.', hand:true, dur:2.4},
+  {stage:2, data:{hr:'84 /dk', spo2:'%99', bp:'118/76', temp:'36,6 °C'}, vitals:'NB 84 · SpO₂ 99 · TA 118/76', log:'Sensörler: vitaller normal.', dur:1.1},
+  {stage:3, say:'Bugün sizi buraya ne getirdi?', dur:1.5},
+  {stage:3, patient:'Merdivenden inerken ayağım burkuldu, basınca ağrıyor.', claude:'record_findings → şikâyet: ayak bileği yaralanması, mekanizma: burkulma, kırmızı bayrak yok, güven 0,95', data:{complaint:'Ayak bileği yaralanması', flags:'yok'}, dur:1.8},
+  {stage:3, say:'Ağrınız 0 ile 10 arasında kaç?', buttons:['0–3','4–7','8–10'], dur:1.5},
+  {stage:3, patient:'Beş gibi.', data:{pain:{v:'5 / 10', s:'warn'}}, dur:1.1},
+  {stage:4, engine:{rule:4, ai:4, why:['Akut periferik ağrı 4–7 → CTAS 4','Vitaller normal, düzeltici yok']}, log:'Kural CTAS 4, AI CTAS 4 → öneri CTAS 4.', who:'Motor', dur:1.8},
+  {stage:5, nurseOk:'CTAS 4 onaylandı (panelden)', final:4, dur:1.4},
+  {stage:6, say:'Bekleme salonunda sarı alana oturabilirsiniz. 60 dakika içinde tekrar değerlendireceğiz.', dur:1.6},
+  {stage:6, path:[[-1,3],[5,3.6],[9,3.6],[9,5]], pace:'limp', sit:[9,5,9,-2], log:'Bekleme kamerası izliyor · tekrar değerlendirme 60 dk.', dur:2.2}
+ ]},
+ { id:'yigilma', name:'Koridorda yığılma', meta:'71 yaş, erkek', sex:'m', steps:[
+  {stage:0, spawn:[-22,0], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-15,0.3]], pace:'stagger', data:{thermal:'37,2 °C'}, tag:['37,2 °C','#e2ecee'], halo:C.accent, log:'Termal kamera: 37,2 °C.', dur:.6},
+  {stage:0, path:[[-11.5,0.6]], pace:'stagger', data:{gait:{v:'sendeleme · denge kaybı', s:'warn'}}, tag:['Yürüyüş: sendeleme','#f2b13c'], log:'RGB + poz: sendeliyor, denge kaybı.', dur:.5},
+  {stage:0, fall:true, data:{gait:{v:'YERE YIĞILDI', s:'crit'}}, tag:['Yığılma algılandı','#ff6259'], halo:C.red, alarm:'Kritik bulgu kısayolu: koridorda yere yığılma → CTAS 1', kioskBanner:'Hemşire koridora yönlendirildi', dur:.6},
+  {stage:4, engine:{rule:1, ai:1, why:['Kamera: yere yığılma, yanıtsız → CTAS 1','Kiosk atlandı; vital ölçüm yatakta yapılacak']}, log:'Kural CTAS 1 → anında alarm. Kiosk beklenmedi.', who:'Motor', dur:1},
+  {stage:5, nurse:[[3,-4],[-3,0],[-10.6,1.4]], nursePace:'run', waitNurse:true, dur:.4},
+  {stage:5, nurseOk:'CTAS 1 onaylandı · resüsitasyon ekibi çağrıldı', final:1, log:'Hemşire hastanın yanında; sedye istendi.', who:'Hemşire', dur:3}
+ ]},
+ { id:'ates', name:'Ateş, nefes darlığı', meta:'45 yaş, kadın · sensör yükseltir', sex:'f', steps:[
+  {stage:0, spawn:[-22,0.2], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-14,0]], pace:'slow', data:{thermal:{v:'38,9 °C', s:'crit'}}, tag:['38,9 °C · ateş','#ff6259'], halo:0xff8a3d, log:'Termal kamera: 38,9 °C (ateş).', dur:1},
+  {stage:0, path:[[-7,0]], pace:'slow', data:{gait:'normal · sık öksürük'}, tag:['Postür: normal','#5fd07e'], log:'RGB + poz: yürüyüş normal.', dur:.9},
+  {stage:1, path:[KSPOT], pace:'slow', tag:null, say:'Merhaba, ben acil servisin triaj asistanıyım. Kimliğinizi okutur musunuz?', dur:2},
+  {stage:1, data:{id:'45 yaş · kadın · MEDULA ✓'}, say:'Bilgilerinizi kaydetmem gerekiyor; metni size okudum. Onaylıyor musunuz?', buttons:['Onaylıyorum','Tekrar oku','Hemşire çağır'], dur:2.4},
+  {stage:1, patient:'Onayladım.', data:{consent:'sözlü ✓ · ses kesiti kayıtlı'}, dur:1.2},
+  {stage:2, say:'Elinizi sağdaki panele koyun, manşonu kolunuza takacağım.', hand:true, dur:2.4},
+  {stage:2, data:{hr:{v:'118 /dk', s:'warn'}, spo2:{v:'%89', s:'crit'}, bp:'104/66', temp:{v:'39,1 °C', s:'crit'}}, vitals:'NB 118 · SpO₂ 89 · 39,1 °C', alarm:'Kritik vital: SpO₂ %89 → hemşireye anında bildirim', dur:1.4},
+  {stage:3, say:'Bugün sizi buraya ne getirdi?', dur:1.5},
+  {stage:3, patient:'Üç gündür ateşim var, biraz öksürüyorum. Çok kötü değilim.', claude:'record_findings → şikâyet: ateş + öksürük, hasta beyanında kırmızı bayrak yok, güven 0,88', data:{complaint:'Ateş · öksürük', flags:'beyanda yok'}, dur:2},
+  {stage:3, say:'Ağrınız 0 ile 10 arasında kaç?', buttons:['0–3','4–7','8–10'], dur:1.5},
+  {stage:3, patient:'İki.', data:{pain:'2 / 10'}, dur:1},
+  {stage:4, engine:{rule:2, ai:4, why:['AI (yalnız konuşma): ateş + öksürük → CTAS 4','Kural: SpO₂ < %90 → CTAS 2','Öneri = min(2, 4) = CTAS 2 · AI seviyeyi düşüremez']}, log:'Kural CTAS 2, AI CTAS 4 → öneri CTAS 2.', who:'Motor', dur:2.6},
+  {stage:5, nurse:[[3,-4],[1,-2],[-1,-1.3]], nursePace:'run', waitNurse:true, say:'Hemşiremiz yanınıza geliyor. Lütfen bekleyin.', dur:.4},
+  {stage:5, nurseOk:'CTAS 2 onaylandı (yerinde)', final:2, dur:1.4},
+  {stage:6, path:[[-1,3],[6,2.5],[9,-6],[13.9,-11.4]], pace:'slow', nurse:[[-0.4,1.6],[-0.2,3.6],[6.6,3.3],[9.8,-5.5],[14.9,-10.8]], nursePace:'slow', log:'Kırmızı alana yönlendirildi; oksijen başlanacak.', dur:2.5}
+ ]}
+];
+
+
+// ── runner ────────────────────────────────────────────────────────
+let sc = null, si = 0, phase = 'idle', dwell = 0, playing = true, speed = 1, simT = 0, wallT = 0, data = {}, eng = {};
+$('sScen').innerHTML = SCENARIOS.map((s,i)=>'<button data-i="'+i+'" aria-pressed="false">'+esc(s.name)+'<small>'+esc(s.meta)+'</small></button>').join('');
+$('sScen').addEventListener('click', e=>{ const b = e.target.closest('button'); if(b) start(+b.dataset.i); });
+$('sPlay').onclick = ()=>{ playing = !playing; $('sPlay').textContent = playing ? 'Duraklat' : 'Oynat'; if(hasTTS){ playing ? speechSynthesis.resume() : speechSynthesis.pause(); } };
+$('sRestart').onclick = ()=>start(SCENARIOS.indexOf(sc));
+$('sSpeed').onclick = ()=>{ speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1; $('sSpeed').textContent = 'Hız ' + (speed===0.5?'½':speed) + '×'; };
+
+function start(i){
+  if(hasTTS) speechSynthesis.cancel(); busyUntil = 0;
+  sc = SCENARIOS[i]; si = 0; phase = 'idle'; data = {}; eng = {};
+  if(!playing){ playing = true; $('sPlay').textContent = 'Duraklat'; }
+  [...$('sScen').children].forEach((b,j)=>b.setAttribute('aria-pressed', j===i ? 'true':'false'));
+  $('sLog').innerHTML = ''; renderKV(data); setEngine(eng); $('sNurse').textContent = 'Hemşire onayı bekleniyor'; $('sNurse').style.color = '';
+  $('sAlarm').hidden = true; alarmOn = false;
+  active.clear(); dots.forEach(d=>d.c.remove()); dots = []; paintSchema();
+  Object.assign(K, {say:'Hoş geldiniz. Lütfen yaklaşın.', patient:'', buttons:[], speakUntil:0, vitals:null, banner:'', ctas:0});
+  resetPose(patient); resetPose(nurse);
+  placeAt(nurse, NURSE_HOME[0], NURSE_HOME[1], 4.5, 0);
+  setLabel(patient.tag, ''); setLabel(patient.say, ''); setLabel(nurse.tag, ''); setLabel(nurse.say, '');
+  patient.halo.material.opacity = 0; finalRing.visible = false;
+  handPad.material.emissiveIntensity = .15;
+  beginStep();
+}
+function beginStep(){
+  const s = sc.steps[si];
+  if(!s){ phase = 'done'; dwell = 5; schemaRun(true, sc.name + ' · tamamlandı · sıradaki senaryo 5 sn sonra'); return; }
+  setStage(s.stage);
+  if(s.spawn){ resetPose(patient); placeAt(patient, s.spawn[0], s.spawn[1], 0, s.spawn[1]); }
+  if(s.clutch) patient.clutch = true;
+  if(s.path) setPath(patient, s.path, s.pace);
+  if(s.nurse){ setPath(nurse, s.nurse, s.nursePace); hl([], ['hemsire'], s.nursePace === 'run' ? 'alarm' : 'ok', 3); }
+  phase = 'move';
+}
+function applyStep(s){
+  if(s.log) addLog(s.who||'Sistem', s.log);
+  if(s.tag !== undefined){ if(s.tag) setLabel(patient.tag, s.tag[0], s.tag[1]); else setLabel(patient.tag, ''); }
+  if(s.halo){ patient.halo.material.color.setHex(s.halo); patient.halo.material.opacity = .9; }
+  else if(s.tag === null) patient.halo.material.opacity = 0;
+  if(s.say){ K.say = s.say; K.patient = ''; K.buttons = s.buttons||[]; K.speakUntil = simT + Math.max(1.2, s.say.length*0.045); addLog('Avatar', s.say); schemaSay(s.stage); speak(s.say, 'avatar'); }
+  if(s.patient){ K.patient = s.patient; K.buttons = []; addLog('Hasta', s.patient); setLabel(patient.say, s.patient.length > 34 ? s.patient.slice(0,32)+'…' : s.patient, '#e2ecee'); patient.sayUntil = soundOn && hasTTS ? Infinity : simT + 2.2; schemaHear(); speak(s.patient, 'patient'); }
+  if(s.data){ Object.assign(data, s.data); renderKV(data); blip(); }
+  if(s.vitals){ K.vitals = s.vitals; handPad.material.emissiveIntensity = .15; }
+  if(s.hand){ handPad.material.emissiveIntensity = 1.2; }
+  if(s.claude) addLog('Claude', s.claude);
+  if(s.alarm){ $('sAlarm').textContent = s.alarm; $('sAlarm').hidden = false; alarmOn = true; addLog('Alarm', s.alarm); alarmSound(); }
+  if(s.kioskBanner){ K.banner = s.kioskBanner; K.say = 'Kiosk atlandı. Hemşire hastaya yönlendirildi.'; }
+  if(s.engine){ eng = s.engine; setEngine(eng); }
+  if(s.fall){ fall(patient); }
+  if(s.nurseOk){ $('sNurse').textContent = '✓ ' + s.nurseOk; $('sNurse').style.color = 'var(--s-green)'; addLog('Hemşire', s.nurseOk); setLabel(nurse.tag, 'Onay: CTAS ' + s.final, '#5fd07e'); }
+  if(s.final){ K.ctas = s.final; finalRing.material.color.setHex(LV[s.final].hex); finalRing.visible = true; setLabel(patient.tag, 'CTAS ' + s.final + ' · ' + LV[s.final].col, hexs(LV[s.final].hex)); alarmOn = false; $('sAlarm').hidden = true; chime(s.final <= 3 ? [523, 659] : [659, 880, 1046]); }
+  if(s.sit){ sit(patient, s.sit[2], s.sit[3]); }
+  schemaFor(s);
+}
+function update(dt){
+  if(!sc || phase === 'idle') return;
+  if(phase === 'done'){ dwell -= dt; if(dwell <= 0) start((SCENARIOS.indexOf(sc) + 1) % SCENARIOS.length); return; }
+  const s = sc.steps[si];
+  if(phase === 'move'){
+    if(!patient.path.length && (!s.waitNurse || !nurse.path.length)){ applyStep(s); phase = 'dwell'; dwell = s.dur || 1; }
+  } else if(phase === 'dwell'){
+    dwell -= dt;
+    const talking = soundOn && hasTTS && (speechSynthesis.speaking || speechSynthesis.pending) && wallT < busyUntil;
+    if(dwell <= 0 && !talking){ si++; beginStep(); }
+  }
+}
+
+const finalRing = new THREE.Mesh(new THREE.RingGeometry(0.6,0.78,48), new THREE.MeshBasicMaterial({color:C.red, side:THREE.DoubleSide, transparent:true, opacity:.95}));
+finalRing.rotation.x = -Math.PI/2; finalRing.visible = false; scene.add(finalRing);
+let alarmOn = false;
+
+// ── camera views ──────────────────────────────────────────────────
+const VIEWS = {
+  genel:{p:[-4,25,25], t:[-1,0,-0.5]},
+  koridor:{p:[-5,4.2,7], t:[-13,1,0]},
+  kiosk:{p:[-4.4,2.1,2.6], t:[0,1.35,0]},
+  hemsire:{p:[0.5,4.5,-1.5], t:[4.5,1,-8]},
+  takip:null
+};
+let view = 'genel', viewT = 1; const fromP = new THREE.Vector3(), fromT = new THREE.Vector3();
+$('sViews').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  view = b.dataset.v; [...$('sViews').children].forEach(x=>x.setAttribute('aria-pressed', x===b ? 'true':'false'));
+  fromP.copy(cam.position); fromT.copy(controls.target); viewT = reduceMotion ? 1 : 0;
+  if(VIEWS[view] && reduceMotion){ cam.position.set(...VIEWS[view].p); controls.target.set(...VIEWS[view].t); }
+});
+function updateView(dt){
+  if(view === 'takip'){
+    const p = patient.root.position;
+    cam.position.lerp(new THREE.Vector3(p.x - 5, 5.5, p.z + 6.5), Math.min(1, dt*2.5));
+    controls.target.lerp(new THREE.Vector3(p.x, 1, p.z), Math.min(1, dt*3));
+    return;
+  }
+  if(viewT < 1){
+    viewT = Math.min(1, viewT + dt/1.2); const k = viewT*viewT*(3-2*viewT), v = VIEWS[view];
+    cam.position.lerpVectors(fromP, new THREE.Vector3(...v.p), k);
+    controls.target.lerpVectors(fromT, new THREE.Vector3(...v.t), k);
+  }
+}
+
+// ── loop (renders only while the stage is on screen) ──────────────
+let visible = true;
+new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(stageEl);
+const clock = new THREE.Clock(); let kioskAcc = 0;
+function frame(){
+  const raw = Math.min(0.05, clock.getDelta()); wallT += raw;
+  const dt = playing ? raw * speed : 0; simT += dt;
+  update(dt); stepHuman(patient, dt); stepHuman(nurse, dt);
+  if(patient.sayUntil && simT > patient.sayUntil){ setLabel(patient.say, ''); patient.sayUntil = 0; }
+  tickSchema();
+  if(visible){
+    const pp = patient.root.position;
+    finalRing.position.set(pp.x, 0.04, pp.z);
+    const pulse = 0.5 + 0.5*Math.sin(wallT*6);
+    alarmRing.material.opacity = alarmOn ? 0.35 + 0.5*pulse : 0;
+    alarmLight.intensity = alarmOn ? 1.5 + 2*pulse : 0;
+    monScreen.material.color.setHex(alarmOn && pulse > .5 ? C.red : C.accent);
+    thermalCone.material.opacity = (pp.x < -6 && pp.x > -17 && patient.mode!=='fallen') ? 0.13 : 0.06;
+    rgbCone.material.opacity = thermalCone.material.opacity;
+    waitCone.material.opacity = patient.mode === 'sit' ? 0.12 : 0.05;
+    kioskAcc += raw; if(kioskAcc > 1/15){ kioskAcc = 0; drawKiosk(simT); }
+    updateView(raw); controls.update();
+    renderer.render(scene, cam);
+  }
+  requestAnimationFrame(frame);
+}
+drawKiosk(0);
+start(0);
+frame();
+})();
+</script>

@@ -1,0 +1,608 @@
+<title>EmergencyAI Triaj Simülasyonu</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: 3D emergency-department floor on the left, a triage "monitor" panel on the right (stacks below on phones). Single dark look by choice: it reads like a control-room screen. */
+:root{
+  --bg:#0b1316; --panel:#111c20; --panel2:#16242a; --line:#24363c; --ink:#e2ecee; --muted:#8fa2a8;
+  --accent:#4fc0d2; --red:#ff6259; --amber:#f2b13c; --green:#5fd07e; --vio:#b49cf5;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;overflow:hidden}
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 380px}
+.stage{position:relative;min-width:0;min-height:0}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.views{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:12px;display:flex;flex-wrap:wrap;gap:6px}
+.views button,.ctrl button,.scen button{font:600 12px var(--f-body);color:var(--ink);background:rgba(17,28,32,.88);border:1px solid var(--line);border-radius:7px;padding:6px 10px;cursor:pointer}
+.views button[aria-pressed="true"],.scen button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{position:absolute;right:12px;bottom:14px;font:11px var(--f-mono);color:var(--muted);background:rgba(11,19,22,.7);padding:3px 7px;border-radius:5px}
+.alarm{position:absolute;left:50%;top:14px;transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--red);color:#1a0706;font:700 13px var(--f-body);padding:8px 14px;border-radius:8px;box-shadow:0 6px 24px rgba(255,98,89,.35);animation:pulse 1s ease-in-out infinite alternate}
+@keyframes pulse{to{box-shadow:0 6px 34px rgba(255,98,89,.7)}}
+@media (prefers-reduced-motion:reduce){.alarm{animation:none}}
+
+.side{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding-block:16px 24px;padding-left:16px;padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start}
+h1{font:800 1.15rem var(--f-display);margin:0;letter-spacing:-.01em}
+.eyebrow{font:600 10.5px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+.scen{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.scen button{text-align:left;display:grid;gap:1px;padding:7px 9px}
+.scen button small{font:400 11px var(--f-body);color:var(--muted)}
+.ctrl{display:flex;flex-wrap:wrap;gap:6px}
+.stages{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.stages div{height:5px;border-radius:3px;background:var(--line)}
+.stages div.done{background:var(--accent);opacity:.55}
+.stages div.on{background:var(--accent)}
+.stageName{font:600 12.5px var(--f-body);color:var(--ink);margin-top:6px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 12px;display:grid;gap:8px}
+.card h2{font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:12.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-variant-numeric:tabular-nums;text-align:right}
+.kv dd.warn{color:var(--amber)} .kv dd.crit{color:var(--red)}
+.engine{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+.lv{display:grid;gap:1px}
+.lv span{font:600 10px var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.lv b{font:800 1.2rem var(--f-display)}
+.badge{font:800 1.05rem var(--f-display);padding:8px 12px;border-radius:8px;border:2px solid var(--line);color:var(--muted);text-align:center;min-width:92px}
+.badge small{display:block;font:600 10px var(--f-mono);letter-spacing:.05em}
+.badge.r{border-color:var(--red);color:var(--red)} .badge.y{border-color:var(--amber);color:var(--amber)} .badge.g{border-color:var(--green);color:var(--green)}
+.why{margin:0;padding-left:16px;color:var(--muted);font-size:12px;display:grid;gap:2px}
+.nurse{font-size:12.5px}
+.log{display:grid;gap:5px;font-size:12.5px;max-height:240px;overflow-y:auto}
+.log p{margin:0;display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px}
+.log b{font:600 10.5px var(--f-mono);text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+.log .Avatar b{color:var(--accent)} .log .Hasta b{color:var(--ink)} .log .Claude b{color:var(--vio)} .log .Motor b{color:var(--amber)} .log .Alarm b,.log .Alarm span{color:var(--red)} .log .Sistem b{color:var(--muted)} .log .Hemşire b{color:var(--green)}
+.foot{color:var(--muted);font-size:11.5px}
+
+@media (max-width:860px){
+  body{overflow:auto}
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:56vh auto;height:auto}
+  .side{border-left:0;border-top:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px))}
+  .hint{display:none}
+}
+</style>
+
+<div class="app">
+  <div class="stage" id="stage">
+    <div class="alarm" id="alarm" hidden></div>
+    <div class="views" id="views">
+      <button data-v="genel" aria-pressed="true">Genel</button>
+      <button data-v="koridor" aria-pressed="false">Koridor</button>
+      <button data-v="kiosk" aria-pressed="false">Kiosk</button>
+      <button data-v="hemsire" aria-pressed="false">Hemşire</button>
+      <button data-v="takip" aria-pressed="false">Hastayı takip et</button>
+    </div>
+    <div class="hint">sürükle: döndür · tekerlek: yakınlaş</div>
+  </div>
+
+  <aside class="side">
+    <div>
+      <span class="eyebrow">EmergencyAI · simülasyon</span>
+      <h1>Acil triaj akışı</h1>
+      <p class="sub">Örnek hastalar ve değerler. Kural motoru seviyeyi belirler, AI yalnız yükseltebilir, hemşire onaylar.</p>
+    </div>
+    <div class="scen" id="scen"></div>
+    <div class="ctrl">
+      <button id="play">Duraklat</button>
+      <button id="restart">Baştan</button>
+      <button id="speed">Hız 1×</button>
+    </div>
+    <div>
+      <div class="stages" id="stages"></div>
+      <div class="stageName" id="stageName">—</div>
+    </div>
+
+    <div class="card">
+      <h2>Ölçümler</h2>
+      <dl class="kv" id="kv"></dl>
+    </div>
+
+    <div class="card">
+      <h2>Triaj motoru</h2>
+      <div class="engine">
+        <div class="lv"><span>Kural</span><b id="eRule">—</b></div>
+        <div class="lv"><span>AI önerisi</span><b id="eAi">—</b></div>
+        <div class="badge" id="eFinal">—<small>öneri</small></div>
+      </div>
+      <ul class="why" id="eWhy"></ul>
+      <div class="nurse" id="eNurse">Hemşire onayı bekleniyor</div>
+    </div>
+
+    <div class="card">
+      <h2>Görüşme ve olaylar</h2>
+      <div class="log" id="log"></div>
+    </div>
+    <p class="foot">Konuşma hattı: faster-whisper → Claude Haiku 5.5 → Türkçe TTS → TSYNC → Atlas avatarı. Bu sayfa akışı canlandırır, gerçek model çağırmaz.</p>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = {floor:0x18262b, grid1:0x2b3f45, grid2:0x1f3036, wall:0x2a3d44, accent:0x4fc0d2, red:0xff6259, amber:0xf2b13c, green:0x5fd07e, vio:0xb49cf5, skin:0xd9a67e, ink:0xe2ecee};
+const LV = {1:{c:'r',hex:C.red,name:'Resüsitasyon',col:'Kırmızı'},2:{c:'r',hex:C.red,name:'Acil',col:'Kırmızı'},3:{c:'r',hex:C.red,name:'Aciliyetli',col:'Kırmızı'},4:{c:'y',hex:C.amber,name:'Az acil',col:'Sarı'},5:{c:'g',hex:C.green,name:'Acil değil',col:'Yeşil'}};
+
+// ── renderer / scene ──────────────────────────────────────────────
+const stageEl = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stageEl.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1316);
+scene.fog = new THREE.Fog(0x0b1316, 45, 95);
+const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+cam.position.set(-4, 25, 25);
+const controls = new THREE.OrbitControls(cam, renderer.domElement);
+controls.target.set(-1, 0, -0.5);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.47;
+controls.minDistance = 2; controls.maxDistance = 60;
+
+scene.add(new THREE.HemisphereLight(0xcfe8ee, 0x0b1316, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+sun.position.set(-10, 22, 12); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {left:-26, right:26, top:18, bottom:-18, near:1, far:70});
+sun.shadow.camera.updateProjectionMatrix();
+scene.add(sun);
+
+function resize(){
+  const r = stageEl.getBoundingClientRect();
+  renderer.setSize(Math.max(1, r.width), Math.max(1, r.height), false);
+  cam.aspect = Math.max(1, r.width) / Math.max(1, r.height);
+  cam.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stageEl);
+resize();
+
+const mat = (color, o) => new THREE.MeshStandardMaterial(Object.assign({color, roughness:.75, metalness:.05}, o||{}));
+function box(w,h,d,color,o){ const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color,o)); m.castShadow = true; m.receiveShadow = true; return m; }
+
+// ── labels (canvas sprites) ───────────────────────────────────────
+function makeLabel(text, color, scale){
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+  const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false}));
+  sp.renderOrder = 10;
+  const s = scale || 3; sp.scale.set(s, s/4, 1);
+  sp.userData = {cv, tex};
+  setLabel(sp, text, color);
+  return sp;
+}
+function setLabel(sp, text, color){
+  const {cv, tex} = sp.userData, g = cv.getContext('2d');
+  g.clearRect(0,0,512,128);
+  if(!text){ tex.needsUpdate = true; sp.visible = false; return; }
+  sp.visible = true;
+  g.font = '600 44px "Source Sans 3", "Segoe UI", sans-serif';
+  const w = Math.min(500, g.measureText(text).width + 44);
+  g.fillStyle = 'rgba(11,19,22,.86)';
+  roundRect(g, (512-w)/2, 22, w, 84, 18); g.fill();
+  g.strokeStyle = color || '#4fc0d2'; g.lineWidth = 4; g.stroke();
+  g.fillStyle = color || '#e2ecee'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 256, 65, 470);
+  tex.needsUpdate = true;
+}
+function roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+
+// ── building ──────────────────────────────────────────────────────
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(46, 30), mat(C.floor, {roughness:.95}));
+floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
+const grid = new THREE.GridHelper(46, 23, C.grid1, C.grid2); grid.position.y = 0.005; scene.add(grid);
+
+function zonePatch(x, z, w, d, color, label){
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({color, transparent:true, opacity:.13}));
+  p.rotation.x = -Math.PI/2; p.position.set(x, 0.01, z); scene.add(p);
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), new THREE.LineBasicMaterial({color, transparent:true, opacity:.55}));
+  edge.rotation.x = -Math.PI/2; edge.position.set(x, 0.02, z); scene.add(edge);
+  if(label){ const l = makeLabel(label, '#' + color.toString(16).padStart(6,'0'), 4.4); l.position.set(x, 2.8, z - d/2 + 0.6); scene.add(l); }
+}
+const wallMat = mat(C.wall, {transparent:true, opacity:.55});
+function wall(x1, z1, x2, z2, h){
+  const len = Math.hypot(x2-x1, z2-z1), m = new THREE.Mesh(new THREE.BoxGeometry(len, h||2.2, 0.18), wallMat);
+  m.position.set((x1+x2)/2, (h||2.2)/2, (z1+z2)/2); m.rotation.y = -Math.atan2(z2-z1, x2-x1); m.receiveShadow = true; scene.add(m);
+}
+// outer shell with entrance gap on the west side
+wall(-23,-15, 23,-15); wall(-23,15, 23,15); wall(23,-15, 23,15);
+wall(-23,-15, -23,-2.5); wall(-23,2.5, -23,15);
+// corridor walls
+wall(-23,-4, -3,-4); wall(-23,4, -3,4);
+// entrance sign
+const ent = makeLabel('Acil girişi', '#e2ecee', 3.2); ent.position.set(-21.5, 3, 0); scene.add(ent);
+
+zonePatch(-13, 0, 18, 7.6, C.accent, 'Bölge 1 · Koridor');
+zonePatch(0, 0, 6, 7.6, C.accent, 'Bölge 2 · Kiosk');
+zonePatch(14.5, -9.5, 15, 9, C.red, 'Kırmızı alan · CTAS 1–3');
+zonePatch(13, 7.5, 17, 11, C.amber, 'Bölge 3 · Bekleme (sarı/yeşil)');
+zonePatch(4.5, -9, 7, 6, C.green, 'Triaj hemşiresi');
+
+// resus beds in red area
+for(let i=0;i<3;i++){ const b = box(2.1,0.6,1,0xc9d6da); b.position.set(10.5 + i*3.4, 0.45, -12.6); scene.add(b); const bl = box(2.1,0.08,1, C.red, {emissive:C.red, emissiveIntensity:.15}); bl.position.set(10.5+i*3.4,0.8,-12.6); scene.add(bl); }
+
+// waiting room chairs
+const chairSpots = [];
+for(let r=0;r<3;r++) for(let c=0;c<6;c++){
+  const x = 7 + c*2, z = 5 + r*2.6;
+  const seat = box(1.1,0.12,0.9,0x3c5961); seat.position.set(x,0.5,z); scene.add(seat);
+  const back = box(1.1,0.8,0.12,0x3c5961); back.position.set(x,0.9,z+0.45); scene.add(back);
+  for(const lx of [-0.45,0.45]) for(const lz of [-0.35,0.35]){ const l = box(0.06,0.5,0.06,0x2a3d44); l.position.set(x+lx,0.25,z+lz); scene.add(l); }
+  chairSpots.push([x, z]);
+}
+
+// nurse desk
+const desk = box(4,1.05,1.3,0x2f4950); desk.position.set(4.5,0.52,-8.2); scene.add(desk);
+const mon = box(1.3,0.85,0.08,0x0b1316,{emissive:0x113a42, emissiveIntensity:1}); mon.position.set(4.5,1.6,-8.5); scene.add(mon);
+const monScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.18,0.72), new THREE.MeshBasicMaterial({color:0x4fc0d2}));
+monScreen.position.set(4.5,1.6,-8.45); scene.add(monScreen);
+const alarmRing = new THREE.Mesh(new THREE.RingGeometry(1.6,2,48), new THREE.MeshBasicMaterial({color:C.red, transparent:true, opacity:0, side:THREE.DoubleSide}));
+alarmRing.rotation.x = -Math.PI/2; alarmRing.position.set(4.5,0.03,-7.3); scene.add(alarmRing);
+const alarmLight = new THREE.PointLight(C.red, 0, 9); alarmLight.position.set(4.5,3,-7.5); scene.add(alarmLight);
+
+// ── cameras with view cones ───────────────────────────────────────
+function sensorCam(pos, target, color, label){
+  const g = new THREE.Group();
+  const pole = box(0.12, pos[1], 0.12, 0x5d747b); pole.position.set(pos[0], pos[1]/2, pos[2]); g.add(pole);
+  const head = box(0.45,0.3,0.6, 0x1c2a2f, {emissive:color, emissiveIntensity:.25}); head.position.set(...pos); g.add(head);
+  head.lookAt(target[0], target[1], target[2]);
+  const h = Math.hypot(target[0]-pos[0], target[1]-pos[1], target[2]-pos[2]);
+  const geo = new THREE.ConeGeometry(Math.tan(0.42)*h, h, 32, 1, true);
+  geo.translate(0, -h/2, 0); geo.rotateX(-Math.PI/2);
+  const cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color, transparent:true, opacity:.07, side:THREE.DoubleSide, depthWrite:false}));
+  cone.position.set(...pos); cone.lookAt(target[0], target[1], target[2]); g.add(cone);
+  const l = makeLabel(label, '#' + color.toString(16).padStart(6,'0'), 3.2); l.position.set(pos[0], pos[1]+0.8, pos[2]); g.add(l);
+  scene.add(g); return cone;
+}
+const thermalCone = sensorCam([-9.5,2.8,-3.7], [-15,0,0.5], 0xff8a3d, 'Termal kamera');
+const rgbCone = sensorCam([-9.5,2.8,3.7], [-14,0,-0.5], C.accent, 'RGB + poz');
+const waitCone = sensorCam([21.8,3.2,13.6], [12,0,6], C.accent, 'Bekleme kamerası');
+
+// ── kiosk ─────────────────────────────────────────────────────────
+const kiosk = new THREE.Group(); kiosk.position.set(0,0,0); kiosk.rotation.y = -Math.PI/2; scene.add(kiosk);
+const kBase = box(1.2,0.1,0.8,0x2f4950); kBase.position.y = 0.05; kiosk.add(kBase);
+const kBody = box(1.25,2.3,0.22,0x22343a); kBody.position.set(0,1.25,-0.05); kiosk.add(kBody);
+const kCv = document.createElement('canvas'); kCv.width = 360; kCv.height = 640;
+const kTex = new THREE.CanvasTexture(kCv); kTex.encoding = THREE.sRGBEncoding;
+const kScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.96), new THREE.MeshBasicMaterial({map:kTex}));
+kScreen.position.set(0,1.3,0.07); kiosk.add(kScreen);
+const sensorArm = box(0.5,0.08,0.45,0x2f4950); sensorArm.position.set(0.95,1.05,0.15); kiosk.add(sensorArm);
+const handPad = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.03,0.3), mat(0x113a42,{emissive:C.accent, emissiveIntensity:.15}));
+handPad.position.set(0.95,1.105,0.15); kiosk.add(handPad);
+const cuff = box(0.16,0.3,0.16,0x3c5961); cuff.position.set(0.95,1.25,-0.05); kiosk.add(cuff);
+const micBar = box(0.9,0.06,0.08,0x0b1316,{emissive:C.accent, emissiveIntensity:.3}); micBar.position.set(0,2.45,0.04); kiosk.add(micBar);
+const kLabel = makeLabel('AI hemşire kiosku', '#4fc0d2', 3); kLabel.position.set(0,3.3,0); kiosk.add(kLabel);
+
+const K = {say:'Hoş geldiniz. Lütfen yaklaşın.', patient:'', buttons:[], speakUntil:0, vitals:null, banner:'', ctas:0};
+function wrap(g, text, maxW){
+  const words = text.split(' '), lines = []; let line = '';
+  for(const w of words){ const t = line ? line + ' ' + w : w; if(g.measureText(t).width > maxW && line){ lines.push(line); line = w; } else line = t; }
+  if(line) lines.push(line); return lines;
+}
+function drawKiosk(t){
+  const g = kCv.getContext('2d'), W = 360, H = 640;
+  const grd = g.createLinearGradient(0,0,0,H); grd.addColorStop(0,'#123138'); grd.addColorStop(1,'#0b1a1e');
+  g.fillStyle = grd; g.fillRect(0,0,W,H);
+  g.fillStyle = '#0b1316'; g.fillRect(0,0,W,40);
+  g.fillStyle = '#4fc0d2'; g.font = '600 15px "JetBrains Mono", monospace'; g.textBaseline = 'middle';
+  g.fillText('EmergencyAI · Triaj', 14, 20);
+  if(K.vitals){ g.fillStyle = '#8fa2a8'; g.font = '600 12px "JetBrains Mono", monospace'; g.textAlign = 'right'; g.fillText(K.vitals, W-12, 20); g.textAlign = 'left'; }
+  // avatar
+  const speaking = t < K.speakUntil, cx = W/2, cy = 165;
+  g.fillStyle = '#1d4a52'; g.beginPath(); g.ellipse(cx, cy+150, 115, 70, 0, Math.PI, 0); g.fill();       // shoulders/scrubs
+  g.fillStyle = '#d9a67e'; g.fillRect(cx-20, cy+62, 40, 34);                                            // neck
+  g.fillStyle = '#3a2418'; g.beginPath(); g.ellipse(cx, cy-12, 80, 92, 0, 0, Math.PI*2); g.fill();       // hair
+  g.fillStyle = '#e2b48c'; g.beginPath(); g.ellipse(cx, cy+8, 66, 80, 0, 0, Math.PI*2); g.fill();        // face
+  g.fillStyle = '#3a2418'; g.beginPath(); g.ellipse(cx, cy-58, 70, 34, 0, Math.PI, 0); g.fill();         // fringe
+  const blink = (t % 4) < 0.12;
+  g.fillStyle = '#1b1210';
+  for(const ex of [-24, 24]){ g.beginPath(); g.ellipse(cx+ex, cy, 7, blink ? 1.2 : 7.5, 0, 0, Math.PI*2); g.fill(); }
+  g.strokeStyle = '#7a4a34'; g.lineWidth = 3;
+  for(const ex of [-24, 24]){ g.beginPath(); g.moveTo(cx+ex-12, cy-16); g.lineTo(cx+ex+12, cy-17); g.stroke(); }
+  const open = speaking ? 4 + 10*Math.abs(Math.sin(t*13)) * (0.6 + 0.4*Math.sin(t*5.3)) : 2;
+  g.fillStyle = '#7d2f2f'; g.beginPath(); g.ellipse(cx, cy+44, 17, open, 0, 0, Math.PI*2); g.fill();
+  g.fillStyle = '#4fc0d2'; g.fillRect(cx-40, cy+124, 80, 6);                                            // badge strip
+  // speech bubbles
+  let y = 330;
+  g.font = '600 18px "Source Sans 3", sans-serif'; g.textBaseline = 'top';
+  const aLines = wrap(g, K.say, W-56).slice(0,5);
+  g.fillStyle = 'rgba(79,192,210,.14)'; roundRect(g, 16, y, W-32, aLines.length*24+20, 14); g.fill();
+  g.fillStyle = '#e2ecee'; aLines.forEach((l,i)=>g.fillText(l, 28, y+10+i*24));
+  y += aLines.length*24 + 32;
+  if(K.patient){
+    g.font = '400 16px "Source Sans 3", sans-serif';
+    const pLines = wrap(g, '“' + K.patient + '”', W-80).slice(0,3);
+    const bw = W-60;
+    g.fillStyle = 'rgba(226,236,238,.08)'; roundRect(g, W-16-bw, y, bw, pLines.length*21+16, 12); g.fill();
+    g.fillStyle = '#c7d4d7'; pLines.forEach((l,i)=>g.fillText(l, W-4-bw, y+8+i*21));
+    y += pLines.length*21 + 26;
+  }
+  // buttons
+  if(K.buttons.length){
+    const bh = 44, gap = 8; let by = H - 24 - K.buttons.length*(bh+gap);
+    g.font = '600 18px "Source Sans 3", sans-serif'; g.textBaseline = 'middle';
+    K.buttons.forEach(b=>{ g.fillStyle = '#1d4a52'; roundRect(g, 24, by, W-48, bh, 10); g.fill(); g.strokeStyle='#4fc0d2'; g.lineWidth=2; g.stroke(); g.fillStyle='#e2ecee'; g.textAlign='center'; g.fillText(b, W/2, by+bh/2); g.textAlign='left'; by += bh+gap; });
+  }
+  if(K.ctas){
+    const lv = LV[K.ctas], col = lv.c==='r' ? '#ff6259' : lv.c==='y' ? '#f2b13c' : '#5fd07e';
+    g.fillStyle = col; roundRect(g, 24, H-86, W-48, 62, 12); g.fill();
+    g.fillStyle = '#0b1316'; g.font = '800 22px "Archivo", sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+    g.fillText('CTAS ' + K.ctas + ' · ' + lv.col + ' alan', W/2, H-55); g.textAlign='left';
+  }
+  if(K.banner){
+    g.fillStyle = 'rgba(255,98,89,.92)'; g.fillRect(0, 40, W, 34);
+    g.fillStyle = '#1a0706'; g.font = '700 15px "Source Sans 3", sans-serif'; g.textBaseline='middle'; g.fillText(K.banner, 14, 57);
+  }
+  kTex.needsUpdate = true;
+}
+
+// ── people ────────────────────────────────────────────────────────
+function makeHuman(shirt, pants, hair){
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const legGeo = new THREE.CylinderGeometry(0.1,0.085,0.86,10); legGeo.translate(0,-0.43,0);
+  const armGeo = new THREE.CylinderGeometry(0.075,0.065,0.66,10); armGeo.translate(0,-0.33,0);
+  const legs = [-0.12,0.12].map(x=>{ const l = new THREE.Mesh(legGeo, mat(pants)); l.position.set(x,0.9,0); l.castShadow = true; body.add(l); return l; });
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.21,0.62,14), mat(shirt)); torso.position.y = 1.2; torso.castShadow = true; body.add(torso);
+  const arms = [-0.32,0.32].map(x=>{ const a = new THREE.Mesh(armGeo, mat(shirt)); a.position.set(x,1.48,0); a.castShadow = true; body.add(a); return a; });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17,16,12), mat(C.skin)); head.position.y = 1.68; head.castShadow = true; body.add(head);
+  const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.175,16,12,0,Math.PI*2,0,Math.PI/2), mat(hair)); hairM.position.y = 1.7; body.add(hairM);
+  const halo = new THREE.Mesh(new THREE.RingGeometry(0.42,0.55,40), new THREE.MeshBasicMaterial({color:C.accent, transparent:true, opacity:0, side:THREE.DoubleSide}));
+  halo.rotation.x = -Math.PI/2; halo.position.y = 0.03; root.add(halo);
+  const tag = makeLabel('', '#e2ecee', 2.6); tag.position.y = 2.35; root.add(tag);
+  const say = makeLabel('', '#e2ecee', 3.6); say.position.y = 2.95; root.add(say);
+  scene.add(root);
+  return {root, body, legs, arms, torso, halo, tag, say, path:[], speed:1.3, phase:0, mode:'stand', clutch:false, sayUntil:0};
+}
+const patient = makeHuman(0x7d8f96, 0x2b3a55, 0x2a1d16);
+const nurse = makeHuman(0x2f8fa0, 0x2f8fa0, 0x1b1210);
+const NURSE_HOME = [4.5, -7.2];
+
+function placeAt(h, x, z, faceX, faceZ){ h.root.position.set(x,0,z); h.path = []; if(faceX!==undefined) h.root.rotation.y = Math.atan2(faceX-x, faceZ-z); }
+function resetPose(h){ h.mode='stand'; h.clutch=false; h.body.rotation.set(0,0,0); h.body.position.set(0,0,0); h.legs.forEach(l=>l.rotation.set(0,0,0)); h.arms.forEach(a=>a.rotation.set(0,0,0)); }
+const PACE = {slow:0.8, walk:1.3, limp:0.7, run:3.2, stagger:0.7};
+function setPath(h, pts, pace){ h.path = pts.map(p=>new THREE.Vector3(p[0],0,p[1])); h.speed = PACE[pace||'walk']; h.pace = pace||'walk'; if(h.mode!=='fallen') resetPoseKeep(h); }
+function resetPoseKeep(h){ if(h.mode==='sit'){ h.mode='stand'; h.body.position.y=0; h.legs.forEach(l=>l.rotation.x=0); } }
+
+function stepHuman(h, dt){
+  if(h.mode === 'fallen') return;
+  if(h.path.length){
+    const p = h.root.position, tgt = h.path[0], d = tgt.clone().sub(p); d.y = 0;
+    const dist = d.length(), stepLen = h.speed * dt;
+    if(dist <= stepLen){ p.copy(tgt); h.path.shift(); }
+    else { d.normalize(); p.addScaledVector(d, stepLen); const yaw = Math.atan2(d.x, d.z); h.root.rotation.y += angDiff(yaw, h.root.rotation.y) * Math.min(1, dt*10); }
+    h.phase += dt * h.speed * 5.2;
+    const amp = h.pace === 'run' ? 0.75 : 0.45, s = Math.sin(h.phase);
+    h.legs[0].rotation.x = s*amp; h.legs[1].rotation.x = -s*amp * (h.pace==='limp' ? 0.35 : 1);
+    h.arms[0].rotation.x = -s*amp*0.8; h.arms[1].rotation.x = h.clutch ? 0 : s*amp*0.8;
+    h.body.position.y = Math.abs(Math.cos(h.phase))*0.04 - (h.pace==='limp' && s>0 ? 0.04 : 0);
+    if(h.pace === 'stagger') h.body.rotation.z = Math.sin(h.phase*0.5)*0.12;
+  } else if(h.mode !== 'sit'){
+    h.legs.forEach(l=>l.rotation.x *= 0.85); h.arms[0].rotation.x *= 0.85; if(!h.clutch) h.arms[1].rotation.x *= 0.85;
+    h.body.position.y *= 0.8;
+  }
+  if(h.clutch){ h.arms[1].rotation.x = -1.25; h.arms[1].rotation.z = 0.55; } else h.arms[1].rotation.z *= 0.8;
+}
+function angDiff(a, b){ let d = a - b; while(d > Math.PI) d -= Math.PI*2; while(d < -Math.PI) d += Math.PI*2; return d; }
+function sit(h, faceX, faceZ){ h.mode='sit'; h.path=[]; h.root.rotation.y = Math.atan2(faceX-h.root.position.x, faceZ-h.root.position.z); h.body.position.y = -0.38; h.legs.forEach(l=>l.rotation.x = -1.45); }
+function fall(h){ h.mode='fallen'; h.path=[]; h.legs.forEach(l=>l.rotation.x=0); h.body.rotation.x = -Math.PI/2; h.body.position.set(0,0.22,0); }
+
+// ── panel ─────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const STAGES = ['Koridor taraması','Kimlik ve sözlü onay','Vital ölçüm','Görüşme (Claude)','Triaj motoru','Hemşire onayı','Yönlendirme'];
+$('stages').innerHTML = STAGES.map(()=>'<div></div>').join('');
+const FIELDS = [['thermal','Termal (koridor)'],['gait','Yürüyüş / postür'],['id','Kimlik'],['consent','Onay'],['hr','Nabız'],['spo2','SpO₂'],['bp','Tansiyon'],['temp','Ateş'],['complaint','Şikâyet (Claude)'],['pain','Ağrı'],['flags','Kırmızı bayrak']];
+function renderKV(data){
+  $('kv').innerHTML = FIELDS.map(([k,l])=>{ const v = data[k]; const val = v ? (v.v||v) : '—'; const cls = v && v.s ? ' class="'+v.s+'"' : ''; return '<dt>'+l+'</dt><dd'+cls+'>'+esc(val)+'</dd>'; }).join('');
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function setStage(i){ [...$('stages').children].forEach((d,j)=>{ d.className = j<i ? 'done' : j===i ? 'on' : ''; }); $('stageName').textContent = (i+1) + ' / 7 · ' + STAGES[i]; }
+function addLog(who, text){ const p = document.createElement('p'); p.className = who; p.innerHTML = '<b>'+esc(who)+'</b><span>'+esc(text)+'</span>'; const lg = $('log'); lg.appendChild(p); lg.scrollTop = lg.scrollHeight; }
+function setEngine(e){
+  $('eRule').textContent = e.rule ? 'CTAS ' + e.rule : '—';
+  $('eAi').textContent = e.ai ? 'CTAS ' + e.ai : '—';
+  const f = e.rule && e.ai ? Math.min(e.rule, e.ai) : (e.rule || e.ai || 0);
+  const b = $('eFinal'); b.className = 'badge' + (f ? ' ' + LV[f].c : '');
+  b.innerHTML = (f ? 'CTAS ' + f : '—') + '<small>' + (f ? LV[f].name.toUpperCase() : 'ÖNERİ') + '</small>';
+  $('eWhy').innerHTML = (e.why||[]).map(w=>'<li>'+esc(w)+'</li>').join('');
+}
+
+// ── scenarios ─────────────────────────────────────────────────────
+const KSPOT = [-1.6, 0];
+const SCENARIOS = [
+ { id:'gogus', name:'Göğüs ağrısı', meta:'58 yaş, erkek', steps:[
+  {stage:0, spawn:[-22,0.4], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-14,0.2]], pace:'slow', clutch:true, data:{thermal:'36,9 °C'}, tag:['36,9 °C · normal','#5fd07e'], halo:C.accent, log:'Termal kamera: yüz sıcaklığı 36,9 °C.', dur:1},
+  {stage:0, path:[[-7,0]], pace:'slow', data:{gait:{v:'yavaş · göğsü tutuyor', s:'warn'}}, tag:['Postür: göğsü tutuyor','#f2b13c'], log:'RGB + poz: yavaş yürüyüş, sağ eli göğsünde.', dur:1},
+  {stage:1, path:[KSPOT], pace:'slow', tag:null, say:'Merhaba, ben acil servisin triaj asistanıyım. Kimliğinizi okutur musunuz?', dur:2.2},
+  {stage:1, data:{id:'58 yaş · erkek · MEDULA ✓'}, say:'Bilgilerinizi kaydetmem gerekiyor; metni size okudum. Onaylıyor musunuz?', buttons:['Onaylıyorum','Tekrar oku','Hemşire çağır'], dur:2.6},
+  {stage:1, patient:'Onayladım.', data:{consent:'sözlü ✓ · ses kesiti kayıtlı'}, dur:1.3},
+  {stage:2, say:'Teşekkürler. Elinizi sağdaki panele koyun, manşonu kolunuza takacağım.', hand:true, dur:2.6},
+  {stage:2, data:{hr:{v:'112 /dk', s:'warn'}, spo2:'%94', bp:{v:'165/98', s:'warn'}, temp:'36,8 °C'}, vitals:'NB 112 · SpO₂ 94 · TA 165/98', log:'Sensörler: vitaller alındı.', dur:1.2},
+  {stage:3, say:'Bugün sizi buraya ne getirdi?', dur:1.6},
+  {stage:3, patient:'Yarım saattir göğsümde baskı var, sol koluma vuruyor.', claude:'record_findings → şikâyet: göğüs ağrısı (kardiyak özellikli), başlangıç: 30 dk, kola yayılım, güven 0,93', data:{complaint:{v:'Göğüs ağrısı · kardiyak', s:'crit'}, flags:{v:'kola yayılım · 30 dk', s:'crit'}}, alarm:'Kritik cevap: kardiyak göğüs ağrısı → hemşireye anında bildirim', dur:2},
+  {stage:3, say:'Ağrınız 0 ile 10 arasında kaç?', buttons:['0–3','4–7','8–10'], dur:1.6},
+  {stage:3, patient:'Sekiz.', data:{pain:{v:'8 / 10', s:'crit'}}, dur:1.1},
+  {stage:4, engine:{rule:2, ai:2, why:['Göğüs ağrısı, kardiyak özellikli → CTAS 2','Nabız 112 · TA 165/98 destekliyor']}, log:'Kural CTAS 2, AI CTAS 2 → öneri CTAS 2.', who:'Motor', dur:1.8},
+  {stage:5, nurse:[[3,-4],[1,-2],[-1,-1.3]], nursePace:'run', waitNurse:true, say:'Hemşiremiz yanınıza geliyor. Lütfen bekleyin.', dur:.4},
+  {stage:5, nurseOk:'CTAS 2 onaylandı (yerinde)', final:2, dur:1.4},
+  {stage:6, path:[[-1,3],[6,2.5],[9,-6],[10.5,-11.4]], pace:'slow', nurse:[[-0.4,1.6],[-0.2,3.6],[6.6,3.3],[9.8,-5.5],[11.5,-10.8]], nursePace:'slow', log:'Kırmızı alana, resüsitasyon yatağına yönlendirildi.', dur:2.5}
+ ]},
+ { id:'bilek', name:'Ayak bileği', meta:'24 yaş, kadın', steps:[
+  {stage:0, spawn:[-22,-0.4], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-14,-0.2]], pace:'limp', data:{thermal:'36,6 °C'}, tag:['36,6 °C · normal','#5fd07e'], halo:C.accent, log:'Termal kamera: 36,6 °C.', dur:1},
+  {stage:0, path:[[-7,0]], pace:'limp', data:{gait:{v:'sol ayakta topallama', s:'warn'}}, tag:['Yürüyüş: topallama','#f2b13c'], log:'RGB + poz: sol ayağa yük vermiyor.', dur:1},
+  {stage:1, path:[KSPOT], pace:'limp', tag:null, say:'Merhaba, ben acil servisin triaj asistanıyım. Kimliğinizi okutur musunuz?', dur:2},
+  {stage:1, data:{id:'24 yaş · kadın · MEDULA ✓'}, say:'Bilgilerinizi kaydetmem gerekiyor; metni size okudum. Onaylıyor musunuz?', buttons:['Onaylıyorum','Tekrar oku','Hemşire çağır'], dur:2.4},
+  {stage:1, patient:'Onayladım.', data:{consent:'sözlü ✓ · ses kesiti kayıtlı'}, dur:1.2},
+  {stage:2, say:'Elinizi sağdaki panele koyun, manşonu kolunuza takacağım.', hand:true, dur:2.4},
+  {stage:2, data:{hr:'84 /dk', spo2:'%99', bp:'118/76', temp:'36,6 °C'}, vitals:'NB 84 · SpO₂ 99 · TA 118/76', log:'Sensörler: vitaller normal.', dur:1.1},
+  {stage:3, say:'Bugün sizi buraya ne getirdi?', dur:1.5},
+  {stage:3, patient:'Merdivenden inerken ayağım burkuldu, basınca ağrıyor.', claude:'record_findings → şikâyet: ayak bileği yaralanması, mekanizma: burkulma, kırmızı bayrak yok, güven 0,95', data:{complaint:'Ayak bileği yaralanması', flags:'yok'}, dur:1.8},
+  {stage:3, say:'Ağrınız 0 ile 10 arasında kaç?', buttons:['0–3','4–7','8–10'], dur:1.5},
+  {stage:3, patient:'Beş gibi.', data:{pain:{v:'5 / 10', s:'warn'}}, dur:1.1},
+  {stage:4, engine:{rule:4, ai:4, why:['Akut periferik ağrı 4–7 → CTAS 4','Vitaller normal, düzeltici yok']}, log:'Kural CTAS 4, AI CTAS 4 → öneri CTAS 4.', who:'Motor', dur:1.8},
+  {stage:5, nurseOk:'CTAS 4 onaylandı (panelden)', final:4, dur:1.4},
+  {stage:6, say:'Bekleme salonunda sarı alana oturabilirsiniz. 60 dakika içinde tekrar değerlendireceğiz.', dur:1.6},
+  {stage:6, path:[[-1,3],[5,3.6],[9,3.6],[9,5]], pace:'limp', sit:[9,5,9,-2], log:'Bekleme kamerası izliyor · tekrar değerlendirme 60 dk.', dur:2.2}
+ ]},
+ { id:'yigilma', name:'Koridorda yığılma', meta:'71 yaş, erkek', steps:[
+  {stage:0, spawn:[-22,0], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-15,0.3]], pace:'stagger', data:{thermal:'37,2 °C'}, tag:['37,2 °C','#e2ecee'], halo:C.accent, log:'Termal kamera: 37,2 °C.', dur:.6},
+  {stage:0, path:[[-11.5,0.6]], pace:'stagger', data:{gait:{v:'sendeleme · denge kaybı', s:'warn'}}, tag:['Yürüyüş: sendeleme','#f2b13c'], log:'RGB + poz: sendeliyor, denge kaybı.', dur:.5},
+  {stage:0, fall:true, data:{gait:{v:'YERE YIĞILDI', s:'crit'}}, tag:['Yığılma algılandı','#ff6259'], halo:C.red, alarm:'Kritik bulgu kısayolu: koridorda yere yığılma → CTAS 1', kioskBanner:'Hemşire koridora yönlendirildi', dur:.6},
+  {stage:4, engine:{rule:1, ai:1, why:['Kamera: yere yığılma, yanıtsız → CTAS 1','Kiosk atlandı; vital ölçüm yatakta yapılacak']}, log:'Kural CTAS 1 → anında alarm. Kiosk beklenmedi.', who:'Motor', dur:1},
+  {stage:5, nurse:[[3,-4],[-3,0],[-10.6,1.4]], nursePace:'run', waitNurse:true, dur:.4},
+  {stage:5, nurseOk:'CTAS 1 onaylandı · resüsitasyon ekibi çağrıldı', final:1, log:'Hemşire hastanın yanında; sedye istendi.', who:'Hemşire', dur:3}
+ ]},
+ { id:'ates', name:'Ateş, nefes darlığı', meta:'45 yaş, kadın · sensör yükseltir', steps:[
+  {stage:0, spawn:[-22,0.2], log:'Hasta acil girişinden giriyor.', dur:.4},
+  {stage:0, path:[[-14,0]], pace:'slow', data:{thermal:{v:'38,9 °C', s:'crit'}}, tag:['38,9 °C · ateş','#ff6259'], halo:0xff8a3d, log:'Termal kamera: 38,9 °C (ateş).', dur:1},
+  {stage:0, path:[[-7,0]], pace:'slow', data:{gait:'normal · sık öksürük'}, tag:['Postür: normal','#5fd07e'], log:'RGB + poz: yürüyüş normal.', dur:.9},
+  {stage:1, path:[KSPOT], pace:'slow', tag:null, say:'Merhaba, ben acil servisin triaj asistanıyım. Kimliğinizi okutur musunuz?', dur:2},
+  {stage:1, data:{id:'45 yaş · kadın · MEDULA ✓'}, say:'Bilgilerinizi kaydetmem gerekiyor; metni size okudum. Onaylıyor musunuz?', buttons:['Onaylıyorum','Tekrar oku','Hemşire çağır'], dur:2.4},
+  {stage:1, patient:'Onayladım.', data:{consent:'sözlü ✓ · ses kesiti kayıtlı'}, dur:1.2},
+  {stage:2, say:'Elinizi sağdaki panele koyun, manşonu kolunuza takacağım.', hand:true, dur:2.4},
+  {stage:2, data:{hr:{v:'118 /dk', s:'warn'}, spo2:{v:'%89', s:'crit'}, bp:'104/66', temp:{v:'39,1 °C', s:'crit'}}, vitals:'NB 118 · SpO₂ 89 · 39,1 °C', alarm:'Kritik vital: SpO₂ %89 → hemşireye anında bildirim', dur:1.4},
+  {stage:3, say:'Bugün sizi buraya ne getirdi?', dur:1.5},
+  {stage:3, patient:'Üç gündür ateşim var, biraz öksürüyorum. Çok kötü değilim.', claude:'record_findings → şikâyet: ateş + öksürük, hasta beyanında kırmızı bayrak yok, güven 0,88', data:{complaint:'Ateş · öksürük', flags:'beyanda yok'}, dur:2},
+  {stage:3, say:'Ağrınız 0 ile 10 arasında kaç?', buttons:['0–3','4–7','8–10'], dur:1.5},
+  {stage:3, patient:'İki.', data:{pain:'2 / 10'}, dur:1},
+  {stage:4, engine:{rule:2, ai:4, why:['AI (yalnız konuşma): ateş + öksürük → CTAS 4','Kural: SpO₂ < %90 → CTAS 2','Öneri = min(2, 4) = CTAS 2 · AI seviyeyi düşüremez']}, log:'Kural CTAS 2, AI CTAS 4 → öneri CTAS 2.', who:'Motor', dur:2.6},
+  {stage:5, nurse:[[3,-4],[1,-2],[-1,-1.3]], nursePace:'run', waitNurse:true, say:'Hemşiremiz yanınıza geliyor. Lütfen bekleyin.', dur:.4},
+  {stage:5, nurseOk:'CTAS 2 onaylandı (yerinde)', final:2, dur:1.4},
+  {stage:6, path:[[-1,3],[6,2.5],[9,-6],[13.9,-11.4]], pace:'slow', nurse:[[-0.4,1.6],[-0.2,3.6],[6.6,3.3],[9.8,-5.5],[14.9,-10.8]], nursePace:'slow', log:'Kırmızı alana yönlendirildi; oksijen başlanacak.', dur:2.5}
+ ]}
+];
+
+// ── runner ────────────────────────────────────────────────────────
+let sc = null, si = 0, phase = 'idle', dwell = 0, playing = true, speed = 1, simT = 0, data = {}, eng = {};
+$('scen').innerHTML = SCENARIOS.map((s,i)=>'<button data-i="'+i+'" aria-pressed="false">'+esc(s.name)+'<small>'+esc(s.meta)+'</small></button>').join('');
+$('scen').addEventListener('click', e=>{ const b = e.target.closest('button'); if(b) start(+b.dataset.i); });
+$('play').onclick = ()=>{ playing = !playing; $('play').textContent = playing ? 'Duraklat' : 'Oynat'; };
+$('restart').onclick = ()=>start(SCENARIOS.indexOf(sc));
+$('speed').onclick = ()=>{ speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1; $('speed').textContent = 'Hız ' + (speed===0.5?'½':speed) + '×'; };
+
+function start(i){
+  sc = SCENARIOS[i]; si = 0; phase = 'idle'; data = {}; eng = {};
+  [...$('scen').children].forEach((b,j)=>b.setAttribute('aria-pressed', j===i ? 'true':'false'));
+  $('log').innerHTML = ''; renderKV(data); setEngine(eng); $('eNurse').textContent = 'Hemşire onayı bekleniyor'; $('eNurse').style.color = '';
+  $('alarm').hidden = true; alarmOn = false;
+  Object.assign(K, {say:'Hoş geldiniz. Lütfen yaklaşın.', patient:'', buttons:[], speakUntil:0, vitals:null, banner:'', ctas:0});
+  resetPose(patient); resetPose(nurse);
+  placeAt(nurse, NURSE_HOME[0], NURSE_HOME[1], 4.5, 0);
+  setLabel(patient.tag, ''); setLabel(patient.say, ''); setLabel(nurse.tag, ''); setLabel(nurse.say, '');
+  patient.halo.material.opacity = 0; finalRing.visible = false;
+  handPad.material.emissiveIntensity = .15;
+  beginStep();
+}
+function beginStep(){
+  const s = sc.steps[si];
+  if(!s){ phase = 'done'; return; }
+  setStage(s.stage);
+  if(s.spawn){ resetPose(patient); placeAt(patient, s.spawn[0], s.spawn[1], 0, s.spawn[1]); }
+  if(s.clutch) patient.clutch = true;
+  if(s.path) setPath(patient, s.path, s.pace);
+  if(s.nurse) setPath(nurse, s.nurse, s.nursePace);
+  phase = 'move';
+}
+function applyStep(s){
+  if(s.log) addLog(s.who||'Sistem', s.log);
+  if(s.tag !== undefined){ if(s.tag) setLabel(patient.tag, s.tag[0], s.tag[1]); else setLabel(patient.tag, ''); }
+  if(s.halo){ patient.halo.material.color.setHex(s.halo); patient.halo.material.opacity = .9; }
+  else if(s.tag === null) patient.halo.material.opacity = 0;
+  if(s.say){ K.say = s.say; K.patient = ''; K.buttons = s.buttons||[]; K.speakUntil = simT + Math.max(1.2, s.say.length*0.045); addLog('Avatar', s.say); }
+  if(s.patient){ K.patient = s.patient; K.buttons = []; addLog('Hasta', s.patient); setLabel(patient.say, s.patient.length > 34 ? s.patient.slice(0,32)+'…' : s.patient, '#e2ecee'); patient.sayUntil = simT + 2.2; }
+  if(s.data){ Object.assign(data, s.data); renderKV(data); }
+  if(s.vitals){ K.vitals = s.vitals; handPad.material.emissiveIntensity = .15; }
+  if(s.hand){ handPad.material.emissiveIntensity = 1.2; }
+  if(s.claude) addLog('Claude', s.claude);
+  if(s.alarm){ $('alarm').textContent = s.alarm; $('alarm').hidden = false; alarmOn = true; addLog('Alarm', s.alarm); }
+  if(s.kioskBanner){ K.banner = s.kioskBanner; K.say = 'Kiosk atlandı. Hemşire hastaya yönlendirildi.'; }
+  if(s.engine){ eng = s.engine; setEngine(eng); }
+  if(s.fall){ fall(patient); }
+  if(s.nurseOk){ $('eNurse').textContent = '✓ ' + s.nurseOk; $('eNurse').style.color = 'var(--green)'; addLog('Hemşire', s.nurseOk); setLabel(nurse.tag, 'Onay: CTAS ' + s.final, '#5fd07e'); }
+  if(s.final){ K.ctas = s.final; finalRing.material.color.setHex(LV[s.final].hex); finalRing.visible = true; setLabel(patient.tag, 'CTAS ' + s.final + ' · ' + LV[s.final].col, '#' + LV[s.final].hex.toString(16)); alarmOn = false; $('alarm').hidden = true; }
+  if(s.sit){ sit(patient, s.sit[2], s.sit[3]); }
+}
+function update(dt){
+  if(!sc || phase === 'done' || phase === 'idle') return;
+  const s = sc.steps[si];
+  if(phase === 'move'){
+    if(!patient.path.length && (!s.waitNurse || !nurse.path.length)){ applyStep(s); phase = 'dwell'; dwell = s.dur || 1; }
+  } else if(phase === 'dwell'){
+    dwell -= dt;
+    if(dwell <= 0){ si++; beginStep(); }
+  }
+}
+
+// final level ring under the patient
+const finalRing = new THREE.Mesh(new THREE.RingGeometry(0.6,0.78,48), new THREE.MeshBasicMaterial({color:C.red, side:THREE.DoubleSide, transparent:true, opacity:.95}));
+finalRing.rotation.x = -Math.PI/2; finalRing.visible = false; scene.add(finalRing);
+let alarmOn = false;
+
+// ── camera views ──────────────────────────────────────────────────
+const VIEWS = {
+  genel:{p:[-4,25,25], t:[-1,0,-0.5]},
+  koridor:{p:[-5,4.2,7], t:[-13,1,0]},
+  kiosk:{p:[-4.4,2.1,2.6], t:[0,1.35,0]},
+  hemsire:{p:[0.5,4.5,-1.5], t:[4.5,1,-8]},
+  takip:null
+};
+let view = 'genel', viewT = 1, fromP = new THREE.Vector3(), fromT = new THREE.Vector3();
+$('views').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  view = b.dataset.v; [...$('views').children].forEach(x=>x.setAttribute('aria-pressed', x===b ? 'true':'false'));
+  fromP.copy(cam.position); fromT.copy(controls.target); viewT = reduceMotion ? 1 : 0;
+  if(VIEWS[view] && reduceMotion){ cam.position.set(...VIEWS[view].p); controls.target.set(...VIEWS[view].t); }
+});
+function updateView(dt){
+  if(view === 'takip'){
+    const p = patient.root.position;
+    const want = new THREE.Vector3(p.x - 5, 5.5, p.z + 6.5), tgt = new THREE.Vector3(p.x, 1, p.z);
+    cam.position.lerp(want, Math.min(1, dt*2.5)); controls.target.lerp(tgt, Math.min(1, dt*3));
+    return;
+  }
+  if(viewT < 1){
+    viewT = Math.min(1, viewT + dt/1.2); const k = viewT*viewT*(3-2*viewT), v = VIEWS[view];
+    cam.position.lerpVectors(fromP, new THREE.Vector3(...v.p), k);
+    controls.target.lerpVectors(fromT, new THREE.Vector3(...v.t), k);
+  }
+}
+
+// ── loop ──────────────────────────────────────────────────────────
+const clock = new THREE.Clock(); let kioskAcc = 0, wall_t = 0;
+function frame(){
+  const raw = Math.min(0.05, clock.getDelta()); wall_t += raw;
+  const dt = playing ? raw * speed : 0; simT += dt;
+  update(dt); stepHuman(patient, dt); stepHuman(nurse, dt);
+  if(patient.sayUntil && simT > patient.sayUntil){ setLabel(patient.say, ''); patient.sayUntil = 0; }
+  const pp = patient.root.position;
+  finalRing.position.set(pp.x, 0.04, pp.z);
+  const pulse = 0.5 + 0.5*Math.sin(wall_t*6);
+  alarmRing.material.opacity = alarmOn ? 0.35 + 0.5*pulse : 0;
+  alarmLight.intensity = alarmOn ? 1.5 + 2*pulse : 0;
+  monScreen.material.color.setHex(alarmOn && pulse > .5 ? C.red : C.accent);
+  thermalCone.material.opacity = (pp.x < -6 && pp.x > -17 && patient.mode!=='fallen') ? 0.13 : 0.06;
+  rgbCone.material.opacity = thermalCone.material.opacity;
+  waitCone.material.opacity = patient.mode === 'sit' ? 0.12 : 0.05;
+  kioskAcc += raw; if(kioskAcc > 1/15){ kioskAcc = 0; drawKiosk(simT); }
+  updateView(raw); controls.update();
+  renderer.render(scene, cam);
+  requestAnimationFrame(frame);
+}
+drawKiosk(0);
+start(0);
+frame();
+})();
+</script>
