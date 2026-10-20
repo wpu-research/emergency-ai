@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EmergencyAI Kiosk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="/static/kiosk.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.3/lib/three-vrm.module.min.js"
+  }
+}
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="kiosk" id="kiosk" data-state="boot">
+    <header class="k-top">
+      <span class="k-brand">EmergencyAI · Triaj</span>
+      <span class="k-chip" id="presence">Kamera açılıyor…</span>
+    </header>
+
+    <div class="k-avatar">
+      <canvas id="avatar"></canvas>
+      <div class="k-cam">
+        <video id="cam" autoplay muted playsinline></video>
+        <canvas id="camOverlay"></canvas>
+      </div>
+      <div class="k-alarm" id="alarm" hidden>Hemşireye bildirim gönderildi</div>
+    </div>
+
+    <section class="k-talk">
+      <p class="k-say" id="say">Lütfen ekrana doğru yaklaşın.</p>
+      <p class="k-heard" id="heard" hidden></p>
+      <div class="k-buttons" id="buttons"></div>
+      <div class="k-mic">
+        <span class="k-dot" id="micDot"></span>
+        <span id="micText">Bekleniyor</span>
+        <span class="k-level"><i id="micLevel"></i></span>
+      </div>
+      <div class="k-result" id="result" hidden></div>
+    </section>
+
+    <button class="k-start" id="startBtn" hidden>Başlamak için dokunun</button>
+  </main>
+
+  <aside class="nurse">
+    <div class="n-head">
+      <span class="n-eyebrow">Hemşire görünümü</span>
+      <h1>Kiosk oturumu</h1>
+      <p class="n-sub" id="sid">Oturum yok</p>
+    </div>
+
+    <div class="n-card">
+      <h2>Triaj motoru</h2>
+      <div class="n-engine">
+        <div><span>Kural</span><b id="eRule">—</b></div>
+        <div><span>AI</span><b id="eAi">—</b></div>
+        <div class="n-badge" id="eFinal">—<small>öneri</small></div>
+      </div>
+      <ul class="n-why" id="eWhy"></ul>
+    </div>
+
+    <div class="n-card">
+      <h2>Bulgular (Claude)</h2>
+      <dl class="n-kv" id="findings"></dl>
+    </div>
+
+    <div class="n-card">
+      <h2>Sensörler <small>prototipte elle girilir</small></h2>
+      <div class="n-vitals">
+        <label>Nabız<input id="vHr" type="number" inputmode="numeric" placeholder="/dk"></label>
+        <label>SpO₂<input id="vSpo2" type="number" inputmode="numeric" placeholder="%"></label>
+        <label>Sist. TA<input id="vSbp" type="number" inputmode="numeric" placeholder="mmHg"></label>
+        <label>Diyast. TA<input id="vDbp" type="number" inputmode="numeric" placeholder="mmHg"></label>
+        <label>Ateş<input id="vTemp" type="number" step="0.1" inputmode="decimal" placeholder="°C"></label>
+      </div>
+    </div>
+
+    <div class="n-card">
+      <h2>Yazarak konuş <small>mikrofonsuz test</small></h2>
+      <form class="n-type" id="typeForm">
+        <input id="typeIn" type="text" autocomplete="off" placeholder="Hastanın söylediği…">
+        <button type="submit">Gönder</button>
+      </form>
+    </div>
+
+    <div class="n-card">
+      <h2>Süreler</h2>
+      <p class="n-timing" id="timing">—</p>
+    </div>
+
+    <div class="n-card">
+      <h2>Görüşme</h2>
+      <div class="n-log" id="log"></div>
+    </div>
+
+    <div class="n-actions">
+      <button id="manualBtn">Görüşmeyi başlat</button>
+      <button id="resetBtn">Oturumu bitir</button>
+    </div>
+  </aside>
+</div>
+<script type="module" src="/static/kiosk.js"></script>
+</body>
+</html>

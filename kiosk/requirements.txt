@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+anthropic
+faster-whisper
+edge-tts
+piper-tts
+soundfile
+numpy
+transcription-sync @ git+https://github.com/wpu-research/transcription-sync

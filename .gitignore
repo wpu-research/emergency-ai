@@ -3,3 +3,5 @@
 node_modules/
 __pycache__/
 .railway/
+kiosk/data/
+_vault/
