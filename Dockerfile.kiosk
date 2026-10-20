@@ -1,0 +1,12 @@
+# EmergencyAI kiosk (Faz 0) — GPU'suz sunucu: whisper CPU/int8, TTS edge-tts.
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg git libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY kiosk/requirements-server.txt kiosk/requirements-server.txt
+RUN pip install --no-cache-dir -r kiosk/requirements-server.txt
+ENV HF_HOME=/app/.hf WHISPER_MODEL=small TTS_ENGINE=edge HOST=0.0.0.0
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
+COPY kiosk/ kiosk/
+WORKDIR /app/kiosk
+CMD ["python", "server.py"]

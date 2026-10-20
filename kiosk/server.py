@@ -15,7 +15,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -36,11 +36,33 @@ _load_env(HERE.parent / ".env")
 import speech   # noqa: E402  (env önce yüklenmeli)
 import triage   # noqa: E402
 
-ATLAS_DIR = Path(os.path.expanduser(os.environ.get("ATLAS_DIR", "~/tsync_exp/atlas")))
+ATLAS_DIR = Path(os.path.expanduser(os.environ.get("ATLAS_DIR", HERE / "atlas")))
 DATA_DIR = HERE / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="EmergencyAI Kiosk")
+
+KIOSK_PASSWORD = os.environ.get("KIOSK_PASSWORD", "")
+
+
+@app.middleware("http")
+async def basic_auth(request, call_next):
+    """KIOSK_PASSWORD tanımlıysa tüm sayfa ve API şifre ister (kullanıcı adı serbest).
+    Herkese açık adreste Claude kredisinin başkalarınca harcanmasını önler."""
+    if KIOSK_PASSWORD:
+        import secrets
+        auth = request.headers.get("authorization", "")
+        ok = False
+        if auth.lower().startswith("basic "):
+            try:
+                _, _, pw = base64.b64decode(auth[6:]).decode().partition(":")
+                ok = secrets.compare_digest(pw, KIOSK_PASSWORD)
+            except Exception:
+                ok = False
+        if not ok:
+            return Response("Şifre gerekli", status_code=401,
+                            headers={"WWW-Authenticate": 'Basic realm="EmergencyAI Kiosk", charset="UTF-8"'})
+    return await call_next(request)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
 def _atlas_asset(sub: str, name: str):
@@ -171,4 +193,5 @@ def end(sid: str):
 if __name__ == "__main__":
     print("Whisper modeli yükleniyor…")
     speech.load_whisper()
-    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("KIOSK_PORT", 8787)))
+    uvicorn.run(app, host=os.environ.get("HOST", "127.0.0.1"),
+                port=int(os.environ.get("PORT") or os.environ.get("KIOSK_PORT") or 8787))

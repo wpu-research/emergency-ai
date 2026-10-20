@@ -27,3 +27,10 @@ cd kiosk && python3 server.py            # → http://localhost:8787
 - Ayarlar: `WHISPER_MODEL` (small), `TTS_ENGINE` (edge|piper), `EDGE_VOICE`, `CLAUDE_MODEL`, `KIOSK_PORT` (8787).
 - Oturum kayıtları ve sözlü onay sesleri `kiosk/data/` altına yazılır (repoya girmez).
 - Gerçek kioskta Chrome'u `--kiosk --autoplay-policy=no-user-gesture-required` ile açın.
+
+### Canlı kiosk (Railway)
+
+- Adres: https://kiosk-production-41e4.up.railway.app — şifre korumalı (kullanıcı adı serbest; şifre Railway `kiosk` servisinin `KIOSK_PASSWORD` değişkeninde).
+- İmaj: `Dockerfile.kiosk` (GPU yok: whisper CPU/int8, TTS edge-tts). Deploy: `railway up --service kiosk`.
+- Gizli değerler Railway değişkenlerinde: `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID`, `KIOSK_PASSWORD`.
+- Avatar: `kiosk/atlas/public/human.glb` (182 MB → 12 MB küçültülmüş; bkz. `kiosk/atlas/NOTICE.md`).
