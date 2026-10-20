@@ -30,7 +30,7 @@ cd kiosk && python3 server.py            # → http://localhost:8787
 
 ### Canlı kiosk (Railway)
 
-- Adres: https://kiosk-production-41e4.up.railway.app — şifre korumalı (kullanıcı adı serbest; şifre Railway `kiosk` servisinin `KIOSK_PASSWORD` değişkeninde).
+- Adres: https://kiosk-production-41e4.up.railway.app — şifresiz açık (kullanıcı kararı). Gerekirse Railway `kiosk` servisine `KIOSK_PASSWORD` değişkeni eklenip yeniden deploy edilerek şifre açılır.
 - İmaj: `Dockerfile.kiosk` (GPU yok: whisper CPU/int8, TTS edge-tts). Deploy: `railway up --service kiosk`.
-- Gizli değerler Railway değişkenlerinde: `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID`, `KIOSK_PASSWORD`.
+- Gizli değerler Railway değişkenlerinde: `ANTHROPIC_API_KEY`, `ANTHROPIC_WORKSPACE_ID`.
 - Avatar: `kiosk/atlas/public/human.glb` (182 MB → 12 MB küçültülmüş; bkz. `kiosk/atlas/NOTICE.md`).
